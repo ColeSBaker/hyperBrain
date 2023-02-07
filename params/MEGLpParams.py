@@ -45,8 +45,8 @@ overide_norm=1
 #     print('Cannot skip use norm without set c unless overridden')
 #     print('Use Norm set to 1')
 #     use_norm=1
-use_plv=1
-use_identity=0
+use_plv=0
+use_identity=1
 
 # model='HNN'
 model='HGCN'
@@ -105,7 +105,7 @@ def add_params(parser):
     parser.add_argument('--raw_clinical_file', type=str, default=os.path.join(os.getcwd(),'data/MEG/MEG.clinical.csv'))
     parser.add_argument('--raw_scan_file', type=str, default=os.path.join(os.getcwd(),'data/MEG/MEG.ROIs.npy'))
     # a=
-    parser.add_argument('--raw_atlas_file', type=str, default=os.path.join(os.getcwd(),'data/MEG/AALtemplate.csv'))
+    parser.add_argument('--raw_atlas_file', type=str, default=os.path.join(os.getcwd(),'data/MEG/AALtemplate_balanced.csv'))
     parser.add_argument('--data_root', type=str, default=os.path.join(os.getcwd(),'data/MEG'))
     # (?# 'data_root':r"C:\Users\Cole S Baker\Desktop\Thesis\Thesis\hgcn\data\MEG")
     parser.add_argument('--train_file', type=str, default=os.path.join(os.getcwd(),'data/MEG/meg_train_MEG_{}.json'.format(adj_threshold)))  #### WILL BE CHANGED IF REFRESH_DATA (see dataloader_utils)
@@ -161,7 +161,7 @@ def add_params(parser):
 
     parser.add_argument('--n-heads', type=int, default=2)
     parser.add_argument('--alpha', type=float, default=.2)
-    parser.add_argument('--double-precision', type=int, default=1)
+    parser.add_argument('--double-precision', type=int, default=0)
     parser.add_argument('--use-att', type=int, default=0)
     parser.add_argument('--local-agg', type=int, default=0)
     parser.add_argument('--use_frechet_agg', type=int, default=1)
@@ -183,6 +183,7 @@ def add_params(parser):
     parser.add_argument('--val-prop', type=int, default=.2)
     parser.add_argument('--test-prop', type=int, default=.01)
 
+    parser.add_argument('--criteria_dict', type=dict, default={'CogTr':1})
 
 def change_threshold(args,t):
     setattr(args,'adj_threshold',t)

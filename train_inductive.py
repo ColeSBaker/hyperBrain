@@ -41,6 +41,7 @@ def train(args):
             except:
                 
                 models_dir = os.path.join(os.path.join(os.getcwd(),'logs'), args.dataset,args.task, date)
+            
             save_dir = get_dir_name(models_dir)
         else:
             save_dir = args.save_dir
@@ -256,13 +257,6 @@ def train(args):
                 # _,data_i=run_data_single(data, i,model,skip_embedding=True)
                 embeddings_list.append(embeddings)
                 data_list.append(data_i)
-            # print(len(data_list),'LEN DATA LIS')
-            # optimizer.zero_grad()
-            # embeddings_list,_= run_data_batch(data,model)
-            # embeddings=embeddings_list[0]  ### just for saving?? get rid of this shit
-
-            # run_data_batch, return stacked embedding (ie. embedding_list and processed data ie. data_list)
-
 
             train_metrics=model.compute_metrics_multiple(embeddings_list,data_list,'train')
             train_metrics['loss'].backward()
@@ -277,47 +271,6 @@ def train(args):
                 model.c=torch.clip(model.c,0.02)
 
 
-            # print(train_metrics['loss'],'BIG LOSS')
-            # batch_losses=torch.zeros((batch_size))
-            # embeddings = model.encode(data['features'].to(args.device), data['adj_mat'].to(args.device))
-            # print(embeddings.shape,embeddings.type(),'output!!!')
-            
-            # train_metrics = model.compute_metrics(embeddings, data, 'train')
-            # train_metrics=model.compute_metrics_multiple([embeddings],[data],'train')
-
-            ##update epoch metrics--- 
-            # model.update_epoch_stats(embeddings, data, 'train') 
-            # if not use_batch:
-            #     try:
-            #         train_metrics['loss'].backward()
-            #     except:
-            #         model.compute_metrics(embeddings, data, 'train',verbose=True)
-            # else:
-            #     print(batch_loss,'batch!')
-            #     if batch_count==0:
-            #         batch_loss=train_metrics['loss']
-            #     else:
-            #         batch_loss+=train_metrics['loss']
-                
-            #     print(batch_count,'count')
-            #     batch_losses[batch_count]=train_metrics['loss']
-            #     print(batch_losses,'losses')
-
-            #     batch_count+=1
-                
-            #     print(batch_count,batch_size,'bathc count')
-            #     if batch_count==batch_size:
-            #         total_batch_loss=torch.mean(batch_losses)
-            #         # total_batch_loss=batch_loss/float(batch_size)
-            #         print(total_batch_loss,'TOTS LOSS')
-
-            #         # total_batch_loss.backward(retain_graph=True)
-            #         batch_count=0
-            #         batch_loss=0
-            #         batch_losses=torch.zeros((batch_size))
-
-
-            # loss.backward(retain_graph=True)
             if args.grad_clip is not None:
                 max_norm = float(args.grad_clip)
                 all_params = list(model.parameters())
@@ -336,20 +289,7 @@ def train(args):
             # if True:
                 avg_stats,stat_string = model.report_epoch_stats()
                 print(stat_string)
-                # break
-                # break
 
-                # break
-            #     evaluate(epoch, dev_loader, 'dev', model)
-
-            # if model.epoch_stats['num_graphs'] % 10 ==0:
-            #     evaluate(epoch, dev_loader, 'dev', model)
-            # break
-        # print('broekn!')
-        # continue
-        # lr_scheduler.step()
-        # if batch_loss>0:
-            # batch_loss.backward()
         epoch_stats,stat_string = model.report_epoch_stats()
         # evaluate(epoch, dev_loader, 'dev', model)
         # if (epoch + 1) % args.log_freq == 0:

@@ -45,7 +45,7 @@ HyperBrain is a inductive learning method that is applicable for any brain imagi
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-This section will describe the full pipeline of steps, from data ingestion to model training to embedding analysis
+This section will describe the full pipeline of steps, from data ingestion to model training to embedding analysis.
 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -55,12 +55,22 @@ This section will describe the full pipeline of steps, from data ingestion to mo
 <!-- ROADMAP -->
 ## Roadmap
 
-- [ ] Feature 1
-- [ ] Feature 2
-- [ ] Feature 3
-    - [ ] Nested Feature
+- [ ] Data Ingestion
+    - [ ] Sensor to ROI
+    - [ ] Binarize PLV
+    - [ ] ROI to RSN
 
-See the [open issues](https://github.com/github_username/repo_name/issues) for a full list of proposed features (and known issues).
+- [ ] Model Training
+    - [ ] Training
+    - [ ] Hyperparameter tuning
+
+- [ ] Embedding Analysis
+    - [ ] Link Prediction
+    - [x] RSN groupings and featurization. The code for this is available in ingest_embedding.ipynb
+    - [x] Statistical Analysis. The code for this is available in anova_analysis.ipynb
+    - [x] Disease Classificaition. The code for this is available in classification_final.ipynb
+
+
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

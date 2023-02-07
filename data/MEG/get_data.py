@@ -72,10 +72,14 @@ def preprocess(args):
     print(args,'ARGS')
 
     val_subgroup = 1 if hasattr(args,'val_sub') and args.val_sub==1 else 0
+    criteria_dict= args.criteria_dict if  hasattr(args,'criteria_dict') else {}
     val_pct = .95 if args.train_only else getattr(args,'val_prop')
     # use_exclude=False if ((args.train_only) or (val_subgroup>0)) else True
     use_exclude=False
-    raw_data,idxs_dict = dataset_split(download_clinical,download_MEG,getattr(args,'val_prop'),getattr(args,'test_prop'),val_subgroup,use_exclude)
+    # raw_data,idxs_dict = dataset_split(download_clinical,download_MEG,getattr(args,'val_prop'),getattr(args,'test_prop'),val_subgroup,use_exclude)
+
+    raw_data,idxs_dict = dataset_split(download_clinical,download_MEG,getattr(args,'val_prop'),getattr(args,'test_prop'),criteria_dict,use_exclude)
+
 
     if (hasattr(args,'train_noise_level')) and (args.train_noise_level)>0:
         train_noise_level=(args.train_noise_level)
@@ -107,28 +111,8 @@ def preprocess(args):
             data_dict = graph_data_dict_recursive(args,scan,clinical,label_names,
                 atlas=atlas,norm_functions=norm_functions,noise_num=train_noise_num,noise_level=train_noise_level)
 
-            # edges,feats,labels,adj_prob,adj_noise = to_graph(args,scan,clinical,label_names,atlas=atlas,norm_functions=norm_functions)
-
-            # labels = np.array(labels).astype(float)
-            # feats = np.array(feats).astype(float)
 
             print(len(data_dict['edges']))
-
-            # data_dict= {
-            #     'targets': labels.tolist(),
-            #     'edges': edges,
-            #     'node_features': feats.tolist(),
-            #     'graph_id': str(clinical['Scan Index']),
-            #     'adj_prob': adj_prob.tolist(),
-            #     'noise_data':[]}
-
-            # print(data_dict_test,'testerr')
-            # print(data_dict,'old')
-            # print(data_dict_test['noise_data'][0]['edges']==data_dict_test['edges'])
-            # print([len(data_dict_test['noise_data'][i]['edges'])  for i in range(train_noise_num)] ,'before')
-            # print(len(data_dict_test['edges']),'before')
-            # # print(len(data_dict_test['noise_data']))
-            # print(data_dict['node_features'])
             num_feats=len(data_dict['node_features'][0])+1  ### to set args below
             # print(num_feats)  ## probably should just do this at start sum up numbers for each use__ and then add firt
             processed_data[section].append(data_dict)
@@ -567,18 +551,18 @@ def get_edges(G,bi_directional=False):
     return edges
 
 # def 
-def get_scan_index_split_bygroup(clinical_data):
-    criteria = ((clinical_data['Pre']==0)&(clinical_data['CogTr']==1))
-    clinical_val=clinical_data[criteria]
-    clinical_train=clinical_data[~criteria]
-
-    print(clinical_val.shape)
-    print(clinical_train.shape)
-
-    # sjskg
-    val_idx=clinical_val['Scan Index'].values.astype(int).tolist()
-    test_idx=clinical_train['Scan Index'].values[0:2].astype(int).tolist()
-    return val_idx,test_idx
+def get_scan_index_split_bygroup(clinical_data,CogTR_group,diagnosis_group):
+    if CogTR_group>0 and diagnosis_group>0:
+        criteria = ((clinical_data['diagnosis']==diagnosis_group)&(clinical_data['CogTr']==CogTR_group))
+    elif CogTR_group>0:
+        criteria=(clinical_data['CogTr']==CogTR_group)
+    elif diagnosis_group>0:
+        criteria=(clinical_data['diagnosis']==diagnosis_group)
+    else:
+        raise Exception('Need to give us something!')
+    clinical_train=clinical_data[criteria]
+    train_idx=clinical_train['Scan Index'].astype(int).tolist()
+    return train_idx,train_idx
 
     # clinical_train=clinical_data[~criteria]
 
@@ -648,22 +632,30 @@ def download_atlas(atlas_file):
     # asser
     # ss
     return atlas
-def dataset_split(download_clinical,download_MEG,val_pct=.2,test_pct=.1,val_subgroup=False,use_exclude=False):
+def dataset_split(download_clinical,download_MEG,val_pct=.2,test_pct=.1,criteria_dict={},use_exclude=False):
     print('reading data...')
 
     clinical_data = pd.read_csv(download_clinical)
+
+    print(criteria_dict)
+    for criteria,val in criteria_dict.items():
+        clinical_data=clinical_data[clinical_data[criteria]==val]
+
+    print(clinical_data.shape,'CLINICAL SHAPE??')
     scan_data = np.load(download_MEG)  ### here is where we find the norm.. return norm function?
     # load validation dataset
     # valid_idx,test_idx =get_scan_index_patient_split(clinical_data,val_pct,test_pct)
     # print(valid_idx,'VALID')
-    print(use_exclude,'USE EXCLUDE')
+    # print(use_exclude,'USE EXCLUDE')
     
-    if val_subgroup:
-        print('SUB GROUP')
-        valid_idx,test_idx =get_scan_index_split_bygroup(clinical_data)
-    else:
-        print('Traditional split')
-        valid_idx,test_idx =get_scan_index_patient_split(clinical_data,val_pct,test_pct,use_exclude=use_exclude)
+    # if val_subgroup_tups:
+    #     print('SUB GROUP')
+    #     print('subgroups given, go')
+    #     valid_idx,test_idx =get_scan_index_split_bygroup(clinical_data)
+
+    # else:
+    #     print('Traditional split')
+    valid_idx,test_idx =get_scan_index_patient_split(clinical_data,val_pct,test_pct,use_exclude=use_exclude)
     
 
     print('\n\n now')

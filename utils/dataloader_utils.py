@@ -144,7 +144,9 @@ def load_dataset(args,dataset_name, distributed=True):
 
     no_test=True
     if hasattr(args,'train_only') and args.train_only:
-        assert (len(train_dataset))==180
+        if not (hasattr(args,'criteria_dict') and args.criteria_dict):
+
+            assert (len(train_dataset))==180
     elif no_test:
         print(len(train_dataset),len(dev_dataset))
         assert (len(train_dataset)+len(dev_dataset))==180

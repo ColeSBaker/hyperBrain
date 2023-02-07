@@ -54,6 +54,7 @@ couldn't find a cleaner way to add in args without commandline for hyperparam se
 manual_args will overwrite default if they exist
 """
     parser = argparse.ArgumentParser(description='RiemannianGNN')
+    # raise Exception('First')
     parser.add_argument('--name', type=str, default='{:%Y_%m_%d_%H_%M_%S_%f}'.format(datetime.now()))
     parser.add_argument('--task', type=str, choices=['lp', 'nc'])
 
@@ -85,7 +86,9 @@ manual_args will overwrite default if they exist
     # parser.add_argument("--seed", type=int, default=1234)
     parser.add_argument("--split-seed", type=int, default=1234)
     # parser.add_argument("--seed", type=int, default=1234)
+    
     args, _ = parser.parse_known_args()
+
 
     overwrite_with_manual(args,manual_args)
     print(args.task,'should match manual')
@@ -135,7 +138,8 @@ manual_args will overwrite default if they exist
 
     else:
         raise Exception("Dataset: {} and task: {} not implemented together".format(args.dataset,args.task))
-    args = parser.parse_args()
+    # args = parser.parse_args()
+    args, _ = parser.parse_known_args()
     args = overwrite_with_manual(args,manual_args)  ## we must do twice bc we only edited args, not the parser
 
     # args.use_batch = True if args.batch_size>0 else False
@@ -151,6 +155,9 @@ manual_args will overwrite default if they exist
 if __name__ == '__main__':
 
     args = parse_default_args()
+    print(args.save_dir,'SAVE DIR?')
+    # assert False
     loss=train_inductive.train(args)
     print(loss,'final loss')
+    
 
