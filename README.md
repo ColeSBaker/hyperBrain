@@ -61,8 +61,13 @@ This section will describe the full pipeline of steps, from data ingestion to mo
     - [ ] ROI to RSN
 
 - [ ] Model Training
-    - [ ] Training
-    - [ ] Hyperparameter tuning
+    - [x] Training. The code for this is in train_inductive.py. It can be triggered several ways, most simply by calling main.py.
+    - [x] Hyperparameter tuning. The code for this is in hyperparams.py, which runs hyperparameter tuning according to hyperparam_config 
+    - [ ] Scripts for training experiments for Link Prediction experiments. The code for this is in study_linkprediction. It utilizes the hyperparameter code. This is not quite complete.
+            Additionally, it may take up to a day or more to run all combinations. The code is designed to start from where it left off it processes to not complete.
+    - [ ] Baselines
+
+
 
 - [ ] Embedding Analysis
     - [ ] Link Prediction
