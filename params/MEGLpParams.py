@@ -161,7 +161,7 @@ def add_params(parser):
 
     parser.add_argument('--n-heads', type=int, default=2)
     parser.add_argument('--alpha', type=float, default=.2)
-    parser.add_argument('--double-precision', type=int, default=0)
+    parser.add_argument('--double-precision', type=int, default=1)
     parser.add_argument('--use-att', type=int, default=0)
     parser.add_argument('--local-agg', type=int, default=0)
     parser.add_argument('--use_frechet_agg', type=int, default=1)
