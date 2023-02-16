@@ -34,19 +34,19 @@ def add_embed_size(args):
 
 def overwrite_with_manual(args,manual_args):
     if manual_args:
-        print(manual_args,'should have a few')
+        # print(manual_args,'should have a few')
         for k,v in manual_args.items():
 
             if hasattr(args,k):
-                print('match new to old')
-                print(k,v)
-                setattr(args,k,v)
-                print(getattr(args,k))
-            else:
-                print('no match')
+                # print('matching new to old: {} ({}->{})'.format(k,getattr(args,k),v))
                 # print(k,v)
                 setattr(args,k,v)
-                print(getattr(args,k))
+                # print(getattr(args,k))
+            else:
+                # print('no match: {}={}'.format(k,v))
+                # print(k,v)
+                setattr(args,k,v)
+                # print(getattr(args,k))
     return args
 def parse_default_args(manual_args=None):
     """
@@ -56,7 +56,7 @@ manual_args will overwrite default if they exist
     parser = argparse.ArgumentParser(description='RiemannianGNN')
     # raise Exception('First')
     parser.add_argument('--name', type=str, default='{:%Y_%m_%d_%H_%M_%S_%f}'.format(datetime.now()))
-    parser.add_argument('--task', type=str, choices=['lp', 'nc'])
+    parser.add_argument('--task', type=str, default='',choices=['lp', 'nc',''])
 
 
     parser.add_argument('--dataset', type=str, choices=['cora','pubmed','disease_nc','disease_lp','airport',
@@ -92,59 +92,26 @@ manual_args will overwrite default if they exist
 
     overwrite_with_manual(args,manual_args)
     print(args.task,'should match manual')
-    # model-specific params
-    if args.dataset=='synthetic' and args.task=='lp':
-        SyntheticHyperbolicParams.add_params(parser)
-    elif args.dataset=='cora' and args.task=='lp':
-        CoraLpParams.add_params(parser)
-    elif args.dataset=='pubmed' and args.task=='lp':
-        PubMedLpParams.add_params(parser)
-    elif args.dataset=='airport' and args.task=='lp':
-        AirportLpParams.add_params(parser)
-    elif args.dataset=='disease_lp' and args.task=='lp':
-        DiseaseLpParams.add_params(parser)
-    elif args.dataset=='disease_nc' and args.task=='lp':
-        DiseaseLpParams.add_params(parser)
-    elif args.dataset=='proteins' and args.task=='lp':
-        ProteinsLpParams.add_params(parser)
-    elif args.dataset=='meg' and args.task=='lp':
+    assert args.task
+
+    if args.dataset=='meg' and args.task in ('lp','ds'):
         MEGLpParams.add_params(parser)
-    elif args.dataset=='meg_ln' and args.task=='lp':
+    elif args.dataset=='meg_ln' and args.task in ('lp','ds'):
         MEGLinkNodeLpParams.add_params(parser)
-    elif args.dataset=='enron' and args.task=='lp':
+    elif args.dataset=='enron' and args.task in ('lp','ds'):
         EnronLpParams.add_params(parser)
-
-    # if args.dataset=='synthetic' and args.task=='lp':
-    #     SyntheticHyperbolicParams.add_params(parser)
-    elif args.dataset=='cora' and args.task=='nc':
-        CoraNcParams.add_params(parser)
-    elif args.dataset=='pubmed' and args.task=='nc':
-        PubMedNcParams.add_params(parser)
-    elif args.dataset=='airport' and args.task=='nc':
-        AirportNcParams.add_params(parser)
-
-    elif args.dataset=='meg' and args.task=='nc':
-        MEGNcParams.add_params(parser)
-
-    elif (args.dataset=='disease_nc' or args.dataset=='disease_lp') and args.task=='nc':
-        if hasattr(args,'use_pretrained') and args.use_pretrained:
-            print('PRETRAINED DISEASE')
-            DiseaseNcPretrainedParams.add_params(parser)
-        else:
-            print('OOOOOOOOOOOOOOO NC NO PRETRAINING')
-            DiseaseNcParams.add_params(parser)
-    elif args.dataset=='proteins' and args.task=='nc':
-        ProteinsNcParams.add_params(parser)
-
     else:
-        raise Exception("Dataset: {} and task: {} not implemented together".format(args.dataset,args.task))
-    # args = parser.parse_args()
+        raise Exception ('need to pick proper kind of dataset and task: {} {}'.format(args.dataset,args.task))
+
+
+
     args, _ = parser.parse_known_args()
     args = overwrite_with_manual(args,manual_args)  ## we must do twice bc we only edited args, not the parser
 
     # args.use_batch = True if args.batch_size>0 else False
 
     print(args.task,'3')
+    args.train_only=1 if args.task=='ds' else 0
     set_up_fold(args)
     # add_embed_size(args)
     args.device  = 'cuda' if th.cuda.is_available() else 'cpu'
@@ -158,6 +125,6 @@ if __name__ == '__main__':
     print(args.save_dir,'SAVE DIR?')
     # assert False
     loss=train_inductive.train(args)
-    print(loss,'final loss')
+
     
 

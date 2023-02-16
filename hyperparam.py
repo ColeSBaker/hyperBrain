@@ -1,6 +1,7 @@
 import argparse
 from datetime import datetime
 import random
+import shutil
 import numpy as np
 import os
 import time
@@ -65,6 +66,8 @@ def create_study_output_dir(args):
     models_dir = os.path.join(os.path.join(os.getcwd(),'study'), args.dataset,args.task, date)
     # save_dir = get_dir_name(models_dir)
 
+    # this will be an issue if called from other placees
+    # use absolute path to change.
     meg_dir= os.path.join(os.path.join(os.getcwd(),'study'), args.dataset)
     #? train only... how to specify? how to specify subset?
     #"link_preds"
@@ -91,19 +94,17 @@ def create_study_output_dir(args):
     else:
         c_str=str(args.c)+'c'
 
+    dp_str='dp' if args.double_precision else 'nodp'
+
     subset_str=''
     for criteria,v in subset_str:
         subset_str+='{}{}'.format(criteria,v)
 
-    model_str="{}_{}_{}_{}".format(hgcn_str,feat_str,c_str,inp_str)
-    specific_dir=os.path.join(subset_str,"L{}".format(args.output_dim),model_str)
+    model_str="{}_{}_{}_{}_{}".format(hgcn_str,feat_str,c_str,inp_str,dp_str)
+    specific_dir=os.path.join(args.task,subset_str,"L{}".format(args.output_dim),model_str)
     full_dir=os.path.join(meg_dir,specific_dir)
-
-
-    print(full_dir,'FULL DIR')
-    if not os.path.exists(full_dir):
-        os.makedirs(full_dir)
-    return specific_dir
+    print(model_str,'model')
+    return full_dir
 
 def create_objective_fun(args,tunable_param_fn):
 
@@ -149,6 +150,48 @@ def create_objective_fun(args,tunable_param_fn):
         return best_dev
     return objective_fn
 
+def complete_study_one_arg(args,n,erase_empty=True):
+    """
+    this will run the a study of trains n times
+    for one static set of args
+    """
+    create_study_output_dir(args)
+    setattr(args,'study_dir',create_study_output_dir(args))
+    print(args.study_dir,'study dir')
+    # assert os.path.exists(args.study_dir)
+
+    path=args.study_dir
+    # path=r"C:\Users\coleb\OneDrive\Desktop\Fall 2021\Neuro\hyperBrain\study\meg\L3\HGCN_novirt_0.54c_id"
+    if os.path.exists(path):
+        print(os.path.exists(path),'exists for sure')
+        print(os.listdir(path))
+
+        subdirs=[ name for name in os.listdir(path) if os.path.isdir(os.path.join(path, name))]
+        competed=[]
+        # this will have MAJOR problems for parrallelism
+        for sd in subdirs:
+            subdir_path=os.path.join(path,sd)
+            subdir_files=os.listdir(subdir_path)
+
+            # if 'finish_train.txt' in subdir_files:
+            #     competed.append(sd)
+            # else:
+            #     shutil.rmtree( subdir_path )
+        num_completed=len(competed)
+    else:
+        num_completed=0
+    # return
+
+    n_trials=n-num_completed
+    if n_trials<=0:
+        return args.study_dir
+    for n in range(n_trials):
+        # print(n,'')
+        args_copy = copy.deepcopy(args)
+        args_copy.save_dir = get_dir_name(args.study_dir)
+        train_inductive.train(args_copy)
+    return args.study_dir
+
 if __name__ == '__main__':
     # print(config)
     # s
@@ -164,10 +207,6 @@ if __name__ == '__main__':
 
     args = parse_default_args(set_params) ### still need to call this with args for dataset, possibly others
     setattr(args,'study_dir',create_study_output_dir(args))
-
-    # # print(args,'arguments')
-    # dd
-
     args.pruner = set_params['pruner']
     # direction = "minimize" if args.is_regression else "maximize"  ## figure this ot
     # direction = "minimize" if args.is_regression else "maximize"

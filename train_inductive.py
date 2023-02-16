@@ -36,15 +36,13 @@ def train(args):
         if not args.save_dir:
             dt = datetime.datetime.now()
             date = f"{dt.year}_{dt.month}_{dt.day}"
-            try:
-                models_dir = os.path.join(os.environ['LOG_DIR'], args.task, date)
-            except:
-                
-                models_dir = os.path.join(os.path.join(os.getcwd(),'logs'), args.dataset,args.task, date)
+            models_dir = os.path.join(os.path.join(os.getcwd(),'logs'), args.dataset,args.task, date)
             
             save_dir = get_dir_name(models_dir)
         else:
             save_dir = args.save_dir
+        with open('begin_train.txt', 'w') as f:
+            f.write('began')
         logging.basicConfig(level=logging.INFO,
                             handlers=[
                                 logging.FileHandler(os.path.join(save_dir, 'log.txt')),
@@ -80,7 +78,7 @@ def train(args):
     else:
         # args.nb_false_edges = len(data['train_edges_false'])
         # args.nb_edges = len(data['train_edges'])
-        if args.task == 'lp':
+        if args.task in ('lp','ds'):
             Model = LPModel
         else:
             Model = RECModel
@@ -380,6 +378,8 @@ def train(args):
         json.dump(vars(args_to_save), open(os.path.join(save_dir, 'config.json'), 'w'))
         torch.save(model.state_dict(), os.path.join(save_dir, 'model.pth'))
         logging.info(f"Saved model in {save_dir}") ### do we need to save logs or what???
+        with open('finish_train.txt', 'w') as f:
+            f.write('finished')
     # return best_val_metrics,best_test_metrics
     print(best_val_metrics)
     print(best_val_metrics['loss'],'val mets')

@@ -1,14 +1,13 @@
 #!/usr/bin/env/python
-# Copyright (c) Facebook, Inc. and its affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
 
 import argparse
 import os
 
-
+#options (lp,ds) only difference is train_only vs true validation
+task='lp'  
+# looks silly but we reuse in "change_task"
+task_to_train_only={'lp':0,'ds':1}
+train_only=task_to_train_only[task]
 band_thresholds= { 
            'alpha':.329,
            'gamma':.2491,
@@ -25,7 +24,7 @@ else:
 override_c=None
 # set_c
 use_override_c=False
-band_c= { 
+BAND_TO_OPT_C= { 
            'alpha':.54,
            'gamma':.66,
            'beta': .74,
@@ -35,7 +34,7 @@ band_c= {
 if (use_override_c) and ((override_c is None) or (override_c>0) ):
     c=override_c
 else:
-    c=band_c[band]
+    c=BAND_TO_OPT_C[band]
 if c:
     c=float(c)
 
@@ -70,12 +69,13 @@ if model=='HNN':
 def add_params(parser):
     ##Cole added args
     parser.add_argument('--adj_threshold', type=float, default=adj_threshold)
-    parser.add_argument('--use_weight', type=bool, default=False)
+    parser.add_argument('--use_weight', type=bool, default=True)
     parser.add_argument('--is_inductive', type=int, default=1)
     parser.add_argument('--is_regression', type=int, default=0)
     parser.add_argument("--n_classes", type=int, default=2)  
     parser.add_argument('--prop_idx', type=int, default=0)
     parser.add_argument('--use_virtual', type=int, default=use_virtual)
+    # parser.add_argument('--task', type=str, default=task)
 
     ## Cole big changes to existing
     parser.add_argument('--output_act', type=str, default=None, choices=['relu','leaky_relu', 'elu', 'selu',None,'None'])
@@ -165,7 +165,7 @@ def add_params(parser):
     parser.add_argument('--use-att', type=int, default=0)
     parser.add_argument('--local-agg', type=int, default=0)
     parser.add_argument('--use_frechet_agg', type=int, default=1)
-    parser.add_argument('--train_only', type=int, default=1)  #### now the one with val stuff.
+    # parser.add_argument('--train_only', type=int, default=train_only)  #### now the one with val stuff.
     parser.add_argument('--use_val', type=int, default=1) 
     parser.add_argument('--val_sub', type=int, default=0) 
 
@@ -194,6 +194,11 @@ def change_threshold(args,t):
     setattr(args,'indx_file','data/MEG/meg_all_MEG_{}.json')
     indx_file='C:\\Users\\coleb\\OneDrive\\Desktop\\Fall 2021\\Neuro\\hgcn\\data/MEG\\meg_MEG_0'+str(t)+'_latestindx.json'
     return args
+
+def change_task(args,task):
+    setattr(args,'task',task)
+    setattr(args,'train_only',task_to_train_only[task])
+
     # parser.add_argument('--adj_threshold', type=float, default=adj_threshold)
     # parser.add_argument('--train_file', type=str, default=os.path.join(os.getcwd(),'data/MEG/meg_train_MEG_{}.json'.format(adj_threshold)))  #### WILL BE CHANGED IF REFRESH_DATA (see dataloader_utils)
     # parser.add_argument('--dev_file', type=str, default=os.path.join(os.getcwd(),'data/MEG/meg_valid_MEG_{}.json'.format(adj_threshold)))

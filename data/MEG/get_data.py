@@ -59,7 +59,8 @@ def preprocess(args):
         args.data_root=default_dataroot
     # else:
         # download_MEG = args.raw_scan_file
-
+    if args.train_only:
+        assert args.task=='ds', 'Training with no validation with task: {} . only use with ds (for downstream tasks)'.format(args.task)
     atlas_file = args.raw_atlas_file
     download_MEG = args.raw_scan_file
     download_clinical=args.raw_clinical_file
@@ -74,6 +75,7 @@ def preprocess(args):
     val_subgroup = 1 if hasattr(args,'val_sub') and args.val_sub==1 else 0
     criteria_dict= args.criteria_dict if  hasattr(args,'criteria_dict') else {}
     val_pct = .95 if args.train_only else getattr(args,'val_prop')
+
     # use_exclude=False if ((args.train_only) or (val_subgroup>0)) else True
     use_exclude=False
     # raw_data,idxs_dict = dataset_split(download_clinical,download_MEG,getattr(args,'val_prop'),getattr(args,'test_prop'),val_subgroup,use_exclude)
