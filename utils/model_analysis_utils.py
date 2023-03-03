@@ -55,14 +55,35 @@ def save_embeddings(model_dir,save_special=False,overwrite=False):
     setattr(model.args,'refresh_data',1)
     evaluate_inductive(model,['train','dev','test'],save_embeddings=True,save_dir=save_dir)
     
-def load_model(model_dir):
+def save_embeddings_alternative(model_dir,config_override:dict):
+    model=load_model(model_dir)
+    setattr(model.args,'refresh_data',1)
+    assert config_override,'must give us something to override'
+    alt_str=''
+    for arg,val in config_override.items():
+        if not hasattr(model.args,arg):
+            print('MODEL DOES NOT HAVE {}'.format(arg))
+        setattr(model.args,arg,val)
+        alt_str+='_{}{}'.format(arg,val)
+    alt_dir=os.path.join(model_dir,'alternative',alt_str)
+    if not os.path.exists(alt_dir):
+        os.makedirs(alt_dir)
+    else:
+        print('For now, not allowing overrides')
+        return alt_dir
+        assert 'For now, not allowing overrides'
+    evaluate_inductive(model,['train','dev','test'],save_embeddings=True,save_dir=alt_dir)
+    return alt_dir
+def load_model(model_dir,config_override={}):
     model_name ='model'
     model_path = os.path.join(model_dir,"{}.pt".format(model_name))  ### args should be saved with the model
-    config_path = os.path.join(model_dir,'config.json')  ### args should be saved with the model
+    if not config_override:
+        config_path = os.path.join(model_dir,'config.json')  ### args should be saved with the model
     # print(config_path,'CONFI')
     out_embedding_path = model_dir
     model = torch.load(model_path,map_location=torch.device('cpu'))
     print(model.args)
+
     try:
         model.args
     except:

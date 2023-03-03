@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from matplotlib import patches as mpatches
 plt.style.use('seaborn')
 import seaborn as sns
-
+import os
 def standard_anova(data,columns,clinical_df):
     # planning on mixing with mixed_anova
     df = pd.DataFrame(data)
@@ -816,3 +816,40 @@ def slice_metric_df(stat_df_full,label_col,conditionals='',title='',plot_save_pa
 #                     plot_title=title,graph_label_names=group_labels,sort_vals=True,max_plot=1,clinical_df=conditional_df)
 
     
+
+def run_anova(emb_stats,output_dir,title='',label_col='diagnosis',cond_dict={}):
+    """
+    emb_stats either path or pandas dataframe
+    """
+    #     embedding_dir=r'C:\Users\coleb\OneDrive\Desktop\Fall 2021\Neuro\hyperBrain\study\meg\ds\pats_CogTr1\L3\HGCN_full_findc_id_dp'
+    #     emb_stat_paths=[os.path.join(embedding_dir,f) for f in os.listdir(embedding_dir) if 'embedding_stats_' in f]
+    #     print(emb_stats,'STAT PATH')
+    #     if
+    if type(emb_stats)==str:
+        stat_df=pd.read_csv(emb_stats)
+    else:
+        stat_df=deepcopy(emb_stats)
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    plot_save_path=os.path.join(output_dir,'anova_plot'+title)
+    df_save_path=os.path.join(output_dir,'anova_df'+title)
+    if not title:
+        title='RM ANOVA analysis'
+    print(stat_df.shape,'STAT DICT BEFORE')
+    stat_df_before=stat_df
+    for condition,val in cond_dict.items():
+        stat_df=stat_df[stat_df[condition]==val]
+        title='{}_{}{}'.format(title,condition,val)
+    #         title=title+'_'+condition+'=='+val
+    #     print(cond_dict)
+    #     print(title)
+    print(stat_df_before.shape,'BEFORE HAND')
+    print(stat_df.shape,'STAT SHAPE AFTER COND')
+    if not stat_df.shape[0]:
+        print(stat_df_before,'WHAT HAPPENED TO EEVRYTHINGN')
+
+    #     assert False
+    #     return
+
+    slice_metric_df(stat_df,label_col=label_col,title=title,plot_save_path=plot_save_path,df_save_path=df_save_path)

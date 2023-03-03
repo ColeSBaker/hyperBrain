@@ -1453,7 +1453,7 @@ def combine_patient_feats(X,y,clinical_df,
         
 
 def multiple_embedding_analysis(emb_roots,clinical_df,label,net_threshold,
-                               template_df,save_dir='',
+                               template_df,save_dir='',model_dir='',
                                bin_rank_threshold=10,use_binary=False,
                                 suffix='.csv',balanced_atl=True
                                , average=True):
@@ -1488,9 +1488,13 @@ def multiple_embedding_analysis(emb_roots,clinical_df,label,net_threshold,
             continue
         root_files=set(os.listdir(root))
         # check to make sure embeddings are complete 
-        if ('final_model.pth' not in root_files) and ('model.pth' not in root_files) and ('finish_train.txt' not in root_files):
+        if model_dir:
+            print('passed manual model_dir')
+        elif ('final_model.pth' not in root_files) and ('model.pth' not in root_files) and ('finish_train.txt' not in root_files):
             print('training not complete or stopped midway, skipping analysis for {}'.format(root))
             continue
+        else:
+            model_dir=root
         if 'scan_info.csv' not in os.listdir(root):
             print('embeddings not yet saved for {}'.format(root))
             print('Saving now.')
@@ -1499,7 +1503,7 @@ def multiple_embedding_analysis(emb_roots,clinical_df,label,net_threshold,
         emb_root=os.path.join(root,'embeddings')
         # print(emb_root,'embedding root')
 
-        model_path = os.path.join(root,"{}.pt".format('model'))  ### args should be saved with the model
+        model_path = os.path.join(model_dir,"{}.pt".format('model'))  ### args should be saved with the model
         # printmodel_path,'model path'
         model = th.load(model_path,map_location=torch.device('cpu'))
         scan_path =  os.path.join(root,'scan_info.csv')
@@ -1546,7 +1550,7 @@ def multiple_embedding_analysis(emb_roots,clinical_df,label,net_threshold,
     print(running_c/len(emb_roots),'AVERAGE C')
     print('out stat dict')
     if not average:
-        return all_stat_dicts,_,all_stat_dfs
+        return all_stat_dicts,None,all_stat_dfs,None
     
     ### now we average all the vals, hope it works!
     full_dict={}
@@ -1680,5 +1684,42 @@ def load_model(model_dir):
 # x,y,pat_to_indx0=combine_patient_feats(X_weight,graph_labels,clinical_df,conditional=conditionals)
     
     
+
+def run_anova(emb_stats,output_dir,title='',label_col='diagnosis',cond_dict={}):
+    """
+    emb_stats either path or pandas dataframe
+    """
+#     embedding_dir=r'C:\Users\coleb\OneDrive\Desktop\Fall 2021\Neuro\hyperBrain\study\meg\ds\pats_CogTr1\L3\HGCN_full_findc_id_dp'
+#     emb_stat_paths=[os.path.join(embedding_dir,f) for f in os.listdir(embedding_dir) if 'embedding_stats_' in f]
+#     print(emb_stats,'STAT PATH')
+#     if
+    if type(emb_stats)==str:
+        stat_df=pd.read_csv(emb_stats)
+    else:
+        stat_df=deepcopy(emb_stats)
+    
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    plot_save_path=os.path.join(output_dir,'anova_plot'+title)
+    df_save_path=os.path.join(output_dir,'anova_df'+title)
+    if not title:
+        title='RM ANOVA analysis'
+    print(stat_df.shape,'STAT DICT BEFORE')
+    stat_df_before=stat_df
+    for condition,val in cond_dict.items():
+        stat_df=stat_df[stat_df[condition]==val]
+        title='{}_{}{}'.format(title,condition,val)
+#         title=title+'_'+condition+'=='+val
+#     print(cond_dict)
+#     print(title)
+    print(stat_df_before.shape,'BEFORE HAND')
+    print(stat_df.shape,'STAT SHAPE AFTER COND')
+    if not stat_df.shape[0]:
+        print(stat_df_before,'WHAT HAPPENED TO EEVRYTHINGN')
+    
+#     assert False
+#     return
+
+    slice_metric_df(stat_df,label_col=label_col,title=title,plot_save_path=plot_save_path,df_save_path=df_save_path)
     
 # print(x.shape)
