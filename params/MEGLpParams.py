@@ -4,7 +4,7 @@ import argparse
 import os
 
 #options (lp,ds) only difference is train_only vs true validation
-task='lp'  
+task='ds'  
 # looks silly but we reuse in "change_task"
 task_to_train_only={'lp':0,'ds':1}
 train_only=task_to_train_only[task]
@@ -130,7 +130,7 @@ def add_params(parser):
     parser.add_argument('--optimizer', type=str, 
                         default=optimizer, choices=['Adam', 'RiemannianAdam']) 
     parser.add_argument('--momentum', type=float, default=0.999)
-    parser.add_argument('--patience', type=int, default=10)
+    parser.add_argument('--patience', type=int, default=6)
     parser.add_argument('--sweep-c', type=float, default=0)
     parser.add_argument('--lr-reduce-freq', type=float, default=20)
     parser.add_argument('--gamma', type=float, default=.9)
@@ -180,6 +180,7 @@ def add_params(parser):
     parser.add_argument('--use-feats', type=int, default=1)
     parser.add_argument('--normalize-feats', type=int, default=1)
     parser.add_argument('--normalize-adj', type=int, default=1)
+    parser.add_argument('--normalize-id-treatment', type=str, default='raw',choices=['raw','set_to_max'])
     parser.add_argument('--val-prop', type=int, default=.2)
     parser.add_argument('--test-prop', type=int, default=.01)
 

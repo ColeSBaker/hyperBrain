@@ -1,6 +1,13 @@
 
 import pandas as pd
 import numpy as np
+import pingouin as pg
+from statsmodels.stats.multitest import fdrcorrection
+import matplotlib.pyplot as plt
+from matplotlib import patches as mpatches
+plt.style.use('seaborn')
+import seaborn as sns
+
 def standard_anova(data,columns,clinical_df):
     # planning on mixing with mixed_anova
     df = pd.DataFrame(data)
@@ -725,3 +732,87 @@ def slice_metrics(stat_dict,metric_col,clinical_df,conditionals,use_difference=F
         metric_analysis(pw_prob,pw_labels,scan_labels,column_name=['Dist Btw Node Prob'],
                         plot_title='',graph_label_names=group_labels,sort_vals=True,max_plot=8,save_dir=save_dir,ignore_rsn=ignore_rsn,group_analysis=group_analysis)
 
+
+
+
+
+def digest_stat_df(stat_df,stat_type,prob=False):
+    print(c for c in stat_df.columns)
+    
+    cols_to_use=[c for c in stat_df.columns if stat_type.lower() in c.lower()]
+    if prob:
+        cols_to_use=[c for c in cols_to_use if 'prob' in c.lower()]
+    else:
+        cols_to_use=[c for c in cols_to_use if 'prob' not in c.lower()]
+    return np.array(stat_df[cols_to_use]),cols_to_use
+
+def slice_metric_df(stat_df_full,label_col,conditionals='',title='',plot_save_path='',df_save_path=''):
+    if conditionals:
+        conditional_df=stat_df_full[conditionals]
+    else:
+        conditional_df=stat_df_full
+    if len(conditional_df['ID'].unique())*2<=len(conditional_df['ID']):
+        repeated=True
+    else:
+        repeated=False
+    print(conditional_df.shape,'CONDITIONAL DF')
+    scan_labels = conditional_df[label_col].values
+    print(scan_labels,"SCAN LABELS")
+    print(conditional_df['ID'],'ID LABELS')
+    
+    if min(scan_labels)>0:
+        scan_labels=scan_labels-1  
+        
+    if label_col in ('diagnosis','diagnosis_inv'):
+        group_labels = ['Healthy Control', 'SCD']
+    elif label_col == 'CogTr':
+        # group_labels=['Control','CogTr']
+        group_labels=['CogTr','Control']
+    elif label_col == 'Pre':
+        group_labels=['Post','Pre']
+    else:
+        raise Exception('Unknown metric col: {}'.format(metric_col))
+        
+    cluster_labels=["pDMN","aDMN","DAN","FPN","VN","VAN","SN","SMN"]
+        
+    rc,rc_labels=digest_stat_df(conditional_df,stat_type='rad')
+    wc,wc_labels=digest_stat_df(conditional_df,stat_type='coh')
+    bc,bc_labels=digest_stat_df(conditional_df,stat_type='btw')
+    
+    age=np.array(conditional_df[['age']])
+    wc=wc.astype(float)
+
+    val_col=np.array(stat_df_full[label_col])
+    val_col=val_col-val_col.min()
+#     print(val_col,'val col')
+#     print(scan_labels,'graph met')
+#     assert np.sum(np.abs((val_col-scan_labels)))==0
+#     print('ALL EQUAL!')
+
+    print(wc_labels,'WC LABELS')
+
+#     metric_analysis(wc,cluster_labels,scan_labels,column_name=label_col,y_axis=['Cluster Cohesion'],plot_title=title,
+#                     plot_save_path=plot_save_path+'_C',
+#                     graph_label_names=group_labels,sort_vals=True,max_plot=8,clinical_df=conditional_df)
+    print('rad')
+    
+    print(label_col,'label col')
+
+    if repeated:
+        metric_analysis(rc,cluster_labels, scan_labels,column_name=label_col,y_axis=['Cluster Radius from Origin'],
+                    analyze_time=True,
+                    plot_save_path=plot_save_path+'_R_time',df_save_path=df_save_path+'R.csv',
+                    plot_title=title,graph_label_names=group_labels,sort_vals=True,max_plot=8,clinical_df=conditional_df)
+    else:
+        metric_analysis(rc,cluster_labels, scan_labels,column_name=label_col,y_axis=['Cluster Radius from Origin'],
+                        plot_save_path=plot_save_path+'_R',df_save_path=df_save_path+'R.csv',
+                        plot_title=title,graph_label_names=group_labels,sort_vals=True,max_plot=8,clinical_df=conditional_df)
+#     print('btw clust')
+#     metric_analysis(bc,bc_labels,scan_labels,y_axis=['Dist Btw Clusters'],column_name=['Dist Btw Clusters'],
+#                     plot_save_path=plot_save_path+'_D',
+#                     plot_title=title,graph_label_names=group_labels,sort_vals=True,max_plot=6,clinical_df=conditional_df)
+#     metric_analysis(age,['age'], scan_labels,column_name=label_col,y_axis=['age'],
+#                     plot_save_path=plot_save_path+'_A',df_save_path=df_save_path+'A.csv',
+#                     plot_title=title,graph_label_names=group_labels,sort_vals=True,max_plot=1,clinical_df=conditional_df)
+
+    

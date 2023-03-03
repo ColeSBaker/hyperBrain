@@ -18,14 +18,14 @@ import time
 import sys
 import os
 import scipy.stats as st
-import pingouin as pg
+
 from numpy_ml.neural_nets.losses import CrossEntropy
 # from statsmodels.stats.weightstats import DescrStats  ## gonna need that for weighted
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score, classification_report, f1_score,roc_auc_score
 from sklearn.model_selection import cross_val_predict,GridSearchCV
-from statsmodels.stats.multitest import fdrcorrection
+
 from statsmodels.stats.weightstats import DescrStatsW
 import statsmodels.api as sm
 # from test import meg_roi_network_assigments
@@ -73,31 +73,15 @@ from datetime import datetime
 import scipy.sparse as sp
 from scipy import stats
 import pandas as pd
-
-from hyperbolic_learning_master.utils.embed import train_embeddings, load_embeddings,load_embeddings_npy, evaluate_model,mean_average_precision
+from hyperbolic_learning_master.hyperbolic_kmeans.hkmeans import HyperbolicKMeans, plot_clusters,compute_mean
 from hyperbolic_learning_master.utils.utils import poincare_distances,poincare_dist,hyp_lca_all
-
 from diff_frech_mean.frechetmean import Poincare as Frechet_Poincare
 from diff_frech_mean.frechet_agg import frechet_agg
 from diff_frech_mean.frechetmean.frechet import frechet_mean
 
+from utils.model_analysis_utils import save_embeddings
 import os
-from classifiers.CustomClassifiers import AggregateClassifier,AggregateClassifierGrid
 from utils import *
-from hyperbolic_learning_master.utils import *
-from hyperbolic_learning_master.hyperbolic_kmeans.hkmeans import HyperbolicKMeans, plot_clusters,compute_mean
-
-# from sknetwork.data import karate_club
-from scipy.cluster.hierarchy import dendrogram, fcluster, leaves_list, set_link_color_palette,linkage
-# from sknetwork.hierarchy import tree_sampling_divergence, Paris,dasgupta_score,dasgupta_cost  ####### WILL NEED THIS!!
-# from sknetwork.data import house
-import matplotlib as mpl
-from matplotlib.pyplot import cm
-# from scipy.cluster import hierarchy
-# from HypHC_master.utils.lca import hyp_lca
-# from HypHC_master.utils.visualization import plot_geodesic
-# import HypHC_master.utils.visualization as viz
-from heapq import heapify,heappush,heappop
 
 subnet_labels_fn=["pDMN","aDMN","DAN","FPN","VN","VAN","SN","SMN",'N/A']
 subnet_labels_fn=["pDMN","aDMN","DAN","FPN","VN","VAN","SN","SMN",'N/A']
@@ -134,9 +118,11 @@ default_dataroot=os.path.join(os.getcwd(),'data/MEG')
 def load_embedding(emb,template_df,node_col='RoiID',c=1.):
     # read in embedding coordinates
     ## right now, only works on 2d coords-- no reason can't be extended...
+    # really shouldve made these z_0->z_n
     all_dim_cols = ['x','y','z','a','b','c','d','e']
     if type(emb)==str:
 #         print('csv' in emb,'WELL IS IT OR ISNT IT?')
+        print('Reading Embedding: {}'.format(emb))
         if 'csv' in emb:
             emb = pd.read_csv(emb)
             # print(emb,'EMBEDING')
@@ -144,18 +130,13 @@ def load_embedding(emb,template_df,node_col='RoiID',c=1.):
 
             print(len(dim_cols),'NATURAL DIM')
             emb.columns= ['node']+dim_cols
-            print("EMBEDDING CSV LIKE A GOOD CHRISTIAN")
+            # print("EMBEDDING CSV LIKE A GOOD CHRISTIAN")
         else: ### this is so wack
             emb = pd.read_table(emb, delimiter=' ')
             dims= int(emb.columns.values[1])
-            # print(emb,'emb')
-            # print(emb.shape,'EMBEDDING SHAPE (load)')
-            print(dims,'EMBEDDING SHAPE (load)')
+            # print(dims,'EMBEDDING SHAPE (load)')
             # print(dims,'DIMENISION')
             dim_cols = all_dim_cols[:dims]
-#             dim_cols = [ e for e in emb.columns if e!=node_col]
-#             dim_cols = ['node']+dim_cols
-            # print(emb,"EMBEDDING!!")
             emb=emb.sort_index()
             emb = emb.reset_index()      
             emb.columns= ['node']+dim_cols
@@ -1038,16 +1019,14 @@ def embedding_analysis(emb_root,clinical_df,cluster_label,template_df,
                        weighted=False,
                        wc_metric='pairwise', bc_metric='average',rc_metric='average',
                        preloaded_emb=False,emb_df=None,use_binary=True,bin_rank_threshold=10,
-                       net_threshold=.2,suffix='.tsv',dims=2,hkmeans_full=None,balanced_atl=True,c=1,r=2,t=1):
+                       net_threshold=.2,suffix='.tsv',dims=3,hkmeans_full=None,balanced_atl=True,c=1,r=2,t=1):
 #     shared_nodes,excluded_nodes=get_shared_nodes(emb_root,graph_ids,template_df,suffix=suffix)
         
     """
     clinical_df was subbed in for graph_ids to avoid any mistakes with labels
+    clinical_df should ONLY contain the graphs that you would like to be analize
+        ie. if your model has a critera CogTr=1, then only those should be passed in in the clinical_df
     """
-#     print(len(shared_nodes),'SAHRED NODES')
-#     print(excluded_nodes,'didnt make the cut')
-    
-#     eeee
 
     if use_binary:
         thresh_str = 'Rank'+str(bin_rank_threshold)
@@ -1061,23 +1040,14 @@ def embedding_analysis(emb_root,clinical_df,cluster_label,template_df,
     print(out_dir_csv,'out dir')
     # eeee
     if os.path.exists(out_dir) and os.path.exists(out_dir_csv):
-    # if False:
         stat_dict = pickle.load( open(out_dir , "rb" ) )
         full_stat_df = pd.read_csv(out_dir_csv)
-        # print(stat_dict,'STAT DICT')
-        # print(full_stat_df,'FULL STATS')
         return stat_dict,full_stat_df
         print(stat_dict)
-
-        # print('\n\n\n')
 
     print(c,'C')
     print(r,'R')
     print(t,'T')
-
-
-
-
         # eff
     label_names= []
     wc_features = []
@@ -1096,8 +1066,6 @@ def embedding_analysis(emb_root,clinical_df,cluster_label,template_df,
     hk_features=[]
 
     dims_cols = ['x','y','z','a','b','c','d','e','f'][:dims]
-    # dim_cols = ['x','y'] if dims==2 else ['x','y','z']
-    # stat_dict={'wc':{},'rc':{},'bc':{},'node_rad':{},'pw':{},'c_coord':{},'node_coord':{}} 
     stat_dict={'wc':{},'rc':{},'bc':{},'node_rad':{},
     'pw':{},'c_coord':{},'node_coord':{},'hkc':{},'rad_prob':{},'wc_prob':{},'bc_prob':{},'pw_prob':{},'node_rad_prob':{}} 
     ### we really should include all stats right? ie. lets
@@ -1113,45 +1081,37 @@ def embedding_analysis(emb_root,clinical_df,cluster_label,template_df,
         use_binary=False
     
     first=True
-    print(net_threshold)
-    
     if not use_binary:
         print('making bin rank thresh -1 bc not using binary')
         bin_rank_threshold=-1
 
-    # print
     template_df= template_df.apply(
         lambda row: meg_roi_network_assigments(
             row,combine_dmn=False,network_thresh=net_threshold,rank_thresh_inclusive=bin_rank_threshold,use_binary=use_binary
             ,balanced=balanced_atl),axis=1)    
 
-    # print(template_df[template_df['SMN Bin']>0],'TEMPLATE BF')
-    # ee
-
     networks=["pDMN","aDMN","DAN","FPN","VN","VAN","SN","SMN"]
     bin_cols=[n+' Bin' for n in networks]
     # print(pct_or_thresh_name,'thresh it')
     print(template_df[bin_cols].sum(),'eyyy')
-    # suugg
-
-
-    # print()
     roi_to_name=get_roi_to_name(template_df,node_col='RoiID')
     graph_ids=clinical_df['Scan Index'].values
     graph_id_ordered=[]
+    all_files=os.listdir(emb_root)
     # for g_id in graph_ids.astype(int):   ##### easy... create_file list?? then we can just index in w/ graph ids
     for g_id in graph_ids.astype(int):   ##### easy... create_file list?? then we can just index in w/ graph ids
-        print(g_id,'JEZY')
-        # if g_id>2:
-            # break
+        # if g_id<90:
+        #     continue
 
+        emb_name=str(int(g_id))+"_embeddings"+suffix
+        emb_file =os.path.join(emb_root,emb_name)
+        if emb_name not in all_files:
+            print('Skipping {} because not in embeddings list. make sure this is not an error'.format(g_id))
+            continue
         graph_id_ordered.append(g_id)
-        emb_file =os.path.join(emb_root,str(int(g_id))+"_embeddings"+suffix)
+
         emb = load_embedding(emb_file,template_df,c=c)
-#         emb=emb[emb['node_index'].isin(shared_nodes)]
-#         print(label,'LABEL')
-#         print(cluster_label,'Cluster LABEL')
-        # print(emb,'EMY')
+        # dims_cols_to_use = [e for e in emb.columns if e not in dims_cols]
         clustering= fit_and_plot_clusters(emb,title='',ignore_index=[8,17],
                                           label=cluster_label,ignore_plot=True,dims=dims) ## can easily grab clusters from this
 
@@ -1169,16 +1129,7 @@ def embedding_analysis(emb_root,clinical_df,cluster_label,template_df,
 
         node_rad_probs = 1/(np.exp((node_rads - r) / t)+ 1.0)
         node_rad_prob_features.append(node_rad_probs)
-        # node_rad_prob_features.append(np.array(node_polars['hyp_r_prob']))
-        # print(np.array(node_polars['hyp_r']))
-#         node_coords.append(cartesian_to_polar_hyp((hkmeans.centroids)))
-#         print(hkmeans.centroids,'SNETROID')
-#         print(polar_centroids,'new man')hc)
-#         rgffr
-#         print(cluster_emb,'CLUSTERING EMBEDDING!!')
         if weighted:
-#             raise Exception
-#             www
             cluster_feats = cluster_features_weighted(cluster_emb,hkmeans.centroids,
                                             wc_metric=wc_metric, bc_metric=bc_metric,rc_metric=rc_metric
                                                      ,dims=dims,use_binary=False)
@@ -1204,18 +1155,14 @@ def embedding_analysis(emb_root,clinical_df,cluster_label,template_df,
         rad_prob_features.append(cluster_feats['rad_prob'])
         # hk_prob_features.append(cluster_feats['hk_dist_prob'])
 
-
-
         if hkmeans_full is None:
             hk_labels=['None']
         else:
             hk_labels=[str(c) for c in np.arange(hkmeans_full.centroids.shape[0])]
             print(cluster_feats['hk_dist'].shape,'hk_dist shape')
 
-
             if cluster_feats['hk_dist'].shape[1]>len(hk_labels):
                 hk_labels.append('origin') #### we must use one of the origin features
-
         
         bc_prelim = cluster_feats['between']
         bc_prob_prelim = cluster_feats['between_prob']
@@ -1229,8 +1176,6 @@ def embedding_analysis(emb_root,clinical_df,cluster_label,template_df,
         D = poincare_distances(np.array(emb_use[dims_cols]),c=c) 
         D_probs=fd_decoder(D,r,t)
 
-        # print(roi_to_name,'ROI TO NAME')
-        
         node_pairwise,pw_labels =pairwise_matrx_flatten_and_name(D,emb_use['node'].apply(lambda x:roi_to_name[x]))             
         # print(emb_use['hyp_r'],'should changed right?')                                  
         node_pairwise_prob,pw_labels =pairwise_matrx_flatten_and_name(D_probs,emb_use['node'].apply(lambda x:roi_to_name[x]))   
@@ -1266,16 +1211,7 @@ def embedding_analysis(emb_root,clinical_df,cluster_label,template_df,
             cohprob_cols=[ c+'_Cohprob' for c in clustering['labels']]
             btwprob_cols=[ c+'_Btwprob' for c in bc_labels]
             ## could probably do this at the end, but this will avoid any confusion?
-            # full_stat_df_row=pd.DataFrame(columns=['Scan Index']+rad_cols+coh_cols+btw_cols,data=[[g_id]+stat_dict['rc']['stat_df']+stat_dict['wc']['stat_df']+stat_dict['bc']['stat_df']])
-            # full_stat_df=full_stat_df
-        #     first=False
-        # else:
-        #     full_stat_df_row=pd.DataFrame(columns=['Scan Index']+rad_cols+coh_cols+btw_cols,data=[[g_id]+stat_dict['rc']['stat_df']+stat_dict['wc']['stat_df']+stat_dict['bc']['stat_df']])
-        #     full_stat_df=pd.concatenate((full_stat_df,full_stat_df_row))
-        # print(full_stat_df,'full_stat_df')
 
-    ### here we can add to full_stat_df
-    # ss
     stat_dict['wc']['stat_df']= np.array(wc_features)
     stat_dict['rad_prob']['stat_df']= np.array(rad_prob_features)
     stat_dict['rc']['stat_df']= np.array(rc_features)
@@ -1303,25 +1239,16 @@ def embedding_analysis(emb_root,clinical_df,cluster_label,template_df,
     full_stat_df=pd.DataFrame(columns=['Scan Index']+rad_cols+coh_cols+btw_cols+radprob_cols+cohprob_cols+btwprob_cols,data=full_stat_array)
     full_stat_df['Scan Index']=full_stat_df['Scan Index'].astype(int)
 
+
     print(full_stat_df)
     print(clinical_df)
-    # sdds
     # right join just to keep cols in easy order
     full_stat_df=clinical_df.join(full_stat_df,on=['Scan Index'],rsuffix='_',how='right')
-    # full_stat_df=pd.DataFrame(columns=['Scan Index']+rad_cols,data=full_stat_array)
-    # np.save()
-    # print(full_stat_df)
-
-    
-
-    
     pickle.dump( stat_dict, open( out_dir, "wb" ) )
     full_stat_df.to_csv(out_dir_csv)
+
     # pickle.dump( full_stat_df, open( out_dir_csv, "wb" ) )
     return stat_dict,full_stat_df
-
-
-
 
 def get_cluster_feats(label_col,graph_ids,emb_root):
     wc_features = []
@@ -1526,9 +1453,9 @@ def combine_patient_feats(X,y,clinical_df,
         
 
 def multiple_embedding_analysis(emb_roots,clinical_df,label,net_threshold,
-                               template_df,
+                               template_df,save_dir='',
                                bin_rank_threshold=10,use_binary=False,
-                                suffix='.csv',dims=3,balanced_atl=True
+                                suffix='.csv',balanced_atl=True
                                , average=True):
     """
     clinical_df was added in place of scan_ids-- we are going to chage all of it around
@@ -1542,21 +1469,33 @@ def multiple_embedding_analysis(emb_roots,clinical_df,label,net_threshold,
 # rc METRIC
 # bc METRIC
 # node_rad METRIC
-# pw METRIC
+# pw METRICFmetric
+
+    if use_binary:
+        thresh_str = 'Rank'+str(bin_rank_threshold)
+    else:
+        thresh_str= 'PCTt'+str(net_threshold)
+    clinical_df['Scan Index']=clinical_df['Scan Index'].astype(int)
     useable_mets=set(['wc','rc','bc','pw','node_rad','wc_prob','rc_prob','bc_prob','pw_prob','node_rad_prob']) #### these are transductivable, we can average
     first=True
     
     all_stat_dicts=[]
     all_stat_dfs=[]
-#     print(len(emb_roots),'count!')
-    # print(emb_roots)
-    # sss
     running_c=0
+
     for root in emb_roots:
         if ('.pt' in root) or ('.csv' in root) or ('relations' in root):
             continue
-        print(root,'ERRRR')
-#         root = er.split(' ')
+        root_files=set(os.listdir(root))
+        # check to make sure embeddings are complete 
+        if ('final_model.pth' not in root_files) and ('model.pth' not in root_files) and ('finish_train.txt' not in root_files):
+            print('training not complete or stopped midway, skipping analysis for {}'.format(root))
+            continue
+        if 'scan_info.csv' not in os.listdir(root):
+            print('embeddings not yet saved for {}'.format(root))
+            print('Saving now.')
+            save_embeddings(root,overwrite=False)
+
         emb_root=os.path.join(root,'embeddings')
         # print(emb_root,'embedding root')
 
@@ -1575,22 +1514,24 @@ def multiple_embedding_analysis(emb_roots,clinical_df,label,net_threshold,
             print(model.encoder.curvatures[l],'layer of c',l)
             print(c,'listed c')
 
-
-
         running_c+=model.encoder.curvatures[model.args.num_layers-1]
         
             # print(model.encoder.layers[l].c,'layer of c',l)
             # print(model.encoder.layers[l].c,'layer of c',l)
-        # return 'a','s'
-        # continue
         print(r,t,c)    
         print('r','t','c')
         print(model.args.band,'BANDS')
         print(model.args.use_identity,'ID please?')
         print(model.args.use_plv,'PLV')
         print(model.args.use_norm,'graph norm?')
+        # we should probably filter clinical_df by model.args??
+        print(model.args.idxs_dict,'ARGUMENT')
+        all_scan_ids=set([int(s) for s in model.args.idxs_dict['all']])
+        print(all_scan_ids,'All scans?')
+
+        clinical_df_subset=clinical_df[clinical_df['Scan Index'].isin(all_scan_ids)]
         # why not just psass in the whole clinical_df?
-        stat_dict_new,full_stat_df_new=embedding_analysis(emb_root,clinical_df,label,net_threshold=net_threshold,
+        stat_dict_new,full_stat_df_new=embedding_analysis(emb_root,clinical_df_subset,label,net_threshold=net_threshold,
                                template_df=template_df,
                                bin_rank_threshold=bin_rank_threshold,
                            use_binary=use_binary,suffix=suffix,dims=dims,balanced_atl=balanced_atl,
@@ -1599,6 +1540,9 @@ def multiple_embedding_analysis(emb_roots,clinical_df,label,net_threshold,
         all_stat_dicts.append(stat_dict_new)
         all_stat_dfs.append(full_stat_df_new)
         # break
+    if not all_stat_dicts:
+        print('No successful embeddings')
+        return None,None,None,None
     print(running_c/len(emb_roots),'AVERAGE C')
     print('out stat dict')
     if not average:
@@ -1626,11 +1570,6 @@ def multiple_embedding_analysis(emb_roots,clinical_df,label,net_threshold,
         
 #         print(full_dict[''])
         for metric,metric_dict in stat_dict.items():
-            # print(metric_dict,'metric test')
-            # print(metric,'METRIC')
-            # if metric=='node_prob':
-                # print(metric_dict['stat_df'],'METRIC DICT')
-#                 continue
             met_stat_df=metric_dict['stat_df']
 #             print(metric,'METRIC')
             if metric not in useable_mets:
@@ -1638,23 +1577,30 @@ def multiple_embedding_analysis(emb_roots,clinical_df,label,net_threshold,
                 continue
             full_dict[metric]['stat_df']
             full_dict[metric]['stat_df']+=met_stat_df
-#             print(i,'I')
-#             print(met_stat_df)
             if last:
-#                 print(len(all_stat_dicts),'LENGHT')
-#                 print(full_dict[metric]['stat_df'])
                 full_dict[metric]['stat_df']
                 full_dict[metric]['stat_df']/=len(all_stat_dicts)
-#                 print("AFTEEEERRRR")
-#                 print(full_dict[metric]['stat_df'])
-                
-#                 ekjge
+
     print(all_stat_dfs[0].shape,'og shape')
     for df in all_stat_dfs:
         print(df.shape,'DF SHAPE')
     stat_df_cols=all_stat_dfs[0].columns
+    for i in range(0,len(all_stat_dfs)):
+        # col_1=set(all_stat_dfs[i].columns)
+        bad_cols=[c for c in all_stat_dfs[i].columns if 'Unnamed' in c]
+        if bad_cols:
+            # print(bad_cols,'bad cols')
+            all_stat_dfs[i]=all_stat_dfs[i].drop(columns=bad_cols)
+    # DataFrame.drop(columns=[None]
     # turning all dfs into a stacked numpy array so we can take the mean
-    df_concat = np.stack([df for df in all_stat_dfs],axis=2)
+    try:
+        df_concat = np.stack([df for df in all_stat_dfs],axis=2)
+    except:
+        for i in range(1,len(all_stat_dfs)):
+            col_1=set(all_stat_dfs[i].columns)
+            col_0=set(all_stat_dfs[i-1].columns)
+            print(col_0 ^ col_1 , 'disjoint of two sets')
+        raise Exception('MESSED UP stack')
     # creating empy array to turn back into pandas
     avg_stat_array=[]
     #used to keep track of our columns to make a df
@@ -1682,7 +1628,10 @@ def multiple_embedding_analysis(emb_roots,clinical_df,label,net_threshold,
     print(avg_stat_df.shape,'SHAPE')
     print(full_stat_df,'avg stat df')
     
-
+    csv_str='average_'+str(len(all_stat_dfs))+'_embedding_stats_'+str(label)+'_'+thresh_str+'.csv'
+    out_dir_csv=os.path.join(save_dir,csv_str)
+    if save_dir:
+        full_stat_df.to_csv(out_dir_csv)
     return all_stat_dicts,full_dict,all_stat_dfs,full_stat_df
 
 

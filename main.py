@@ -56,7 +56,7 @@ manual_args will overwrite default if they exist
     parser = argparse.ArgumentParser(description='RiemannianGNN')
     # raise Exception('First')
     parser.add_argument('--name', type=str, default='{:%Y_%m_%d_%H_%M_%S_%f}'.format(datetime.now()))
-    parser.add_argument('--task', type=str, default='',choices=['lp', 'nc',''])
+    parser.add_argument('--task', type=str, default='',choices=['lp', 'nc','','ds'])
 
 
     parser.add_argument('--dataset', type=str, choices=['cora','pubmed','disease_nc','disease_lp','airport',

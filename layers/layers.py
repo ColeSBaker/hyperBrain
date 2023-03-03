@@ -80,22 +80,9 @@ class GraphConvolution(Module):
             support = torch.spmm(adj, hidden)
         else:
             support = torch.mm(adj, hidden)
-
-        # print(torch.norm(support,dim=1),'support norm')
-
-        # print(support,'support')
-
-        # print(self.act(support),'weight')
-        # print(support,'pre')
         if self.use_act:
             support = self.act(support)
-        # print(torch.norm(support,dim=1),'act norm')
-
-        # print(support,'weight')
-        # print(adj,'adj')
-        # output=
         output = (support, adj)
-        # print(output,'final output')
         print(torch.norm(support,dim=1),'output norm')
         return output
 
@@ -151,60 +138,8 @@ class FermiDiracDecoder(Module):
         ### i believe these are square distances in practice
         try:
             max_clamp = 88
-            # print(1./math.exp( (88) ),'88')
-            # print(1./math.exp( (89) ),'89')
-            # print(1./math.exp( (90) ),'90')
-            # print(1./math.exp( (91) ),'90')
-            # probs = 1. / ((torch.exp((dist - self.r) / self.t)) + 1.0)
-            # probs = 1. / (torch.exp((dist - self.r) / self.t) + 1.0)
-            # print(max((dist - self.r) / self.t),'max before!')
             probs = 1. / (torch.exp(  torch.clamp( ((dist - self.r) / self.t),max=max_clamp))+ 1.0)
-            # top_parts=(dist - self.r) / self.t,max=max_clamp)
-            # exp = (torch.exp((dist - self.r) / self.t))
-            # probs = 1./exp
-            
-            # print(max_clamp,'clamp it')
-
-
-            # print(max(exp),'before clamp')
-            # exp = torch.clamp(exp,max=10* 10^1)
-            # print(max(torch.clamp( ((dist - self.r) / self.t),max=max_clamp)),'top clamped')
-            # print(max((dist - self.r) / self.t),'top')
-            # print(max(exp),'after clamp')
-            # print()
-            # # probs = 1/exp
-
-            # print(exp,'check')
-            # print(len(probs[torch.isnan(probs)]),'nans')
-            # print(max(exp),'exp')
-            # print(max(dist),'dist')
-            # print(max(dist)/self.t,'dist/t')
-            # print(min(probs),max(probs),'probabilities')
-
-
-            # while exp is None:
-
-            #     dist=dist*10^-2
-            #     print(exp,'after interventino')
-            
-            # denom = exp+1
-
-            # print('PASS TO FermiDiracDecoder')
-            # print(dist,'prbably 0 or massive')
-            # print('probably from embedding that exceeds radius 1?')
-            # print((dist - self.r),'dist')
-            # print((torch.exp((dist - self.r) / self.t)
             diff = (dist - self.r) ## somehow goes to zero faster with lower learning rate?
-            # print
-            # print(dist.min(),dist.max(),'max dist')
-            # print(diff.min(),diff.max(),'max diff')
-            # print(exp.min(),exp.max(),'max epxpo')
-            # print(denom.min(),denom.max(),'max denom')
-            # print(probs.min(),probs.max(),'max probs')
-            # print(torch.nonzero(torch.isnan(probs)),'nan probs')
-            # print(torch.nonzero(torch.isnan(exp)),'nan exp')
-            # print(torch.nonzero(torch.isnan(denom)),'nan denom')
-        # print(torch.nonzero(torch.isnan(pos_scores.view(-1))),'nan pos_scores')
         except Exception as e:
             print('BAD PASS TO FermiDiracDecoder')
             print(dist,'prbably 0 or massive')

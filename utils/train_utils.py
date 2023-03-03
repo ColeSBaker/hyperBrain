@@ -33,7 +33,7 @@ def get_dir_name(models_dir):
                 [
                     d
                     for d in os.listdir(models_dir)
-                    if os.path.isdir(os.path.join(models_dir, d))
+                    if os.path.isdir(os.path.join(models_dir, d)) and d.isnumeric()
                     ]
         ).astype(np.int)
         if len(existing_dirs) > 0:

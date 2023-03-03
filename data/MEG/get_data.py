@@ -257,6 +257,16 @@ def to_graph(args,scan,clinical,label_names,atlas,norm_functions={},return_label
     # new_adjusted = (adj_flat-np.min(adj_flat))/(np.max(adj_flat)-np.min(adj_flat))
     # new_adjusted_clipped = (adj_flat-np.percentile(adj_flat,5))/(np.percentile(adj_flat,95)-np.percentile(adj_flat,5))
     # new_adjusted_clipped=np.clip(new_adjusted_clipped,0,1)
+    # print(args,'ARGS')
+    if args.stretch_pct<1:
+        args.stretch_pct=args.stretch_pct*100
+    if hasattr(args,'normalize_id_treatment'):
+        id_treatment=args.normalize_id_treatment
+    else:
+        # this was how we did it before creating argument
+        id_treatment='raw'
+    # print(args.normalize_id_treatment)
+    # akakak
     adj_flat=[]
     for j in range(single_scan.shape[0]):
         for k in range(j+1, single_scan.shape[0]):
@@ -264,6 +274,7 @@ def to_graph(args,scan,clinical,label_names,atlas,norm_functions={},return_label
     # print(norm_functions.keys(),'final')
     # print(norm_functions['mm_strech'])
     adj_prob_transform='0_1_95th'
+    # adj_prob_transform='0_1_100th'
     if adj_prob_transform  in ('None',None) or norm_functions=={}:
         # raise Exception('CANNOT LEAVE PROB METRIX UNATTENDED LIKE THAT')
         print('CANNOT LEAVE PROB METRIX UNATTENDED LIKE THAT')
@@ -271,14 +282,14 @@ def to_graph(args,scan,clinical,label_names,atlas,norm_functions={},return_label
     else:
 
         if adj_prob_transform=='0_1_95th':
-            adj_prob=norm_functions['mm_strech'](single_scan,mm_min_pct=5,mm_max_pct=95,mm_clip_data=True,identity_treatment='Raw') ## seems like set to max is already covered
+            adj_prob=norm_functions['mm_strech'](single_scan,mm_min_pct=5,mm_max_pct=95,mm_clip_data=True,identity_treatment=id_treatment) ## seems like set to max is already covered
             # adj_prob=norm_functions['mm_strech'](single_scan,mm_min_pct=5,mm_max_2ct=95,mm_clip_data=True,identity_treatment='set_to_max')
             # print(adj_flat)
 
             # adj_prob = (single_scan-np.percentile(adj_flat,5))/(np.percentile(single_scan,95)-np.percentile(adj_flat,5))
             # adj_flat_adj =(adj_flat-np.percentile(adj_flat,5))/(np.percentile(adj_flat,95)-np.percentile(adj_flat,5))
         elif adj_prob_transform=='0_1_100th':
-            adj_prob=norm_functions['mm_strech'](single_scan,mm_min_pct=0,mm_max_pct=100,mm_clip_data=True,identity_treatment='Raw')
+            adj_prob=norm_functions['mm_strech'](single_scan,mm_min_pct=0,mm_max_pct=100,mm_clip_data=True,identity_treatment=id_treatment)
 
     # print(add_noise,'how much noise?')
     # print(adj_prob[0],'prob 1')
@@ -591,10 +602,16 @@ def get_scan_index_patient_split(clinical_data,val_pct,test_pct,pat_col = 'ID',u
     test_ids= set()
     test_idx = []
 
+    print(val_pct,'val pct')
+    print(test_pct,'test_pct')
+    
+    val_pct=float(val_pct)
+    test_pct=float(test_pct)
     n_val = len(pats_full)*val_pct*2
     n_tests = len(pats_full)*test_pct*2
     print(n_val,'NUM VAL')
     print(len(pats))
+
     if n_val+n_tests>len(pats_full)*2:
         raise Exception('not enough to go around')
     while len(valid_idx)<n_val:
@@ -640,6 +657,8 @@ def dataset_split(download_clinical,download_MEG,val_pct=.2,test_pct=.1,criteria
     clinical_data = pd.read_csv(download_clinical)
 
     print(criteria_dict)
+    # add new args here (possibly related to the commented out code below)
+    # this should let you decide whether whether to use the non
     for criteria,val in criteria_dict.items():
         clinical_data=clinical_data[clinical_data[criteria]==val]
 
@@ -677,7 +696,9 @@ def dataset_split(download_clinical,download_MEG,val_pct=.2,test_pct=.1,criteria
     file_count=0
     raw_data = {'train': [], 'valid': [], 'test': [],'all':[]} # save the train, valid dataset.
 
-    train_idx=list(train_idx)+list(test_idx)
+    # cole. I HATE YOU. you are such a piece of shit.
+    # train_idx=list(train_idx)+list(test_idx)
+
     idxs_dict = {'train': train_idx, 'valid': valid_idx, 'test': test_idx,'all':all_scanids}
     # for i, data_item in enumerate(all_data):
     print(len(train_idx),len(valid_idx),len(test_idx),'lengths after add test to train')
@@ -799,7 +820,7 @@ def create_norm_functions(args):    ##identity options, set to 0, set to 1, set 
         return scan
 
 
-    def mm_strech(scan,mm_min_pct=5,mm_max_pct=95,mm_clip_data=True,mm_clip_range=(0,1),identity_treatment='Raw',data_flat=data_flat,invert=False):  ## if you change data_flat to a single scan flat, you can retrofit to single norms
+    def mm_strech(scan,mm_min_pct=5,mm_max_pct=95,mm_clip_data=True,mm_clip_range=(0,1),identity_treatment='raw',data_flat=data_flat,invert=False):  ## if you change data_flat to a single scan flat, you can retrofit to single norms
         scan=deepcopy(scan)
         if identity_treatment=='raw':
             pass
@@ -812,18 +833,19 @@ def create_norm_functions(args):    ##identity options, set to 0, set to 1, set 
         data_flat_use=1/data_flat if invert else data_flat
         scan_use = 1/scan if invert else scan
 
+        print(mm_min_pct,mm_max_pct,'min to max?')
+        # sslls
+
 
         adj_prob = (scan_use-np.percentile(data_flat_use,mm_min_pct))/((np.percentile(data_flat_use,mm_max_pct)-np.percentile(data_flat_use,mm_min_pct)))
-
-
-        # print(adj_prob.min(),adj_prob.max(),'min, max')
         if mm_clip_data:
             adj_prob=np.clip(adj_prob,mm_clip_range[0],mm_clip_range[1])
         # plt.hist(adj_prob.flatten(),bins=28)
         # plt.show()
+        # slslsl
         return adj_prob
 
-    def ms_norm(scan,mm_clip_data=False,mm_clip_range=(0,1),identity_treatment='Raw',percentile_to_set=95,data_flat=data_flat):
+    def ms_norm(scan,mm_clip_data=False,mm_clip_range=(0,1),identity_treatment='raw',percentile_to_set=95,data_flat=data_flat):
 
         data_flat=data_flat
         # data_mean=

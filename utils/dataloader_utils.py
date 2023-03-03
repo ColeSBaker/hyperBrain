@@ -142,7 +142,8 @@ def load_dataset(args,dataset_name, distributed=True):
 
     shuffle = True
 
-    no_test=True
+    #cole. I fucking hate you. you are the fucking worst. by far.
+    no_test=False
     if hasattr(args,'train_only') and args.train_only:
         if not (hasattr(args,'criteria_dict') and args.criteria_dict):
 

@@ -1,3 +1,4 @@
+
 """Base model class."""
 
 import numpy as np
@@ -884,5 +885,3 @@ class LPModel(BaseModel):
                 print('PRUNED')
                 raise optuna.exceptions.TrialPruned()
         return avg_stats,stat_string ## still shows higher numbers but thats okay
-
-    # def format_epoch_stats()

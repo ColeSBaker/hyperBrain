@@ -16,10 +16,11 @@ import pickle
 import optuna
 import copy
 from utils.train_utils import get_dir_name, format_metrics
+from utils.model_analysis_utils import save_embeddings_all,save_embeddings
 from main import parse_default_args
 
 def save_study(args,study):
-    ## should adjust to deal name based on stable params?
+    ## should adjust to deal name based on stable params?s
     study_dir='' if not hasattr(args,'study_dir') else args.study_dir
     if study_dir=='':
         study_dir = os.path.join(os.getcwd(),'study')
@@ -96,12 +97,20 @@ def create_study_output_dir(args):
 
     dp_str='dp' if args.double_precision else 'nodp'
 
-    subset_str=''
-    for criteria,v in subset_str:
-        subset_str+='{}{}'.format(criteria,v)
+    if not args.criteria_dict:
+        subset_str='all_pats'
+    else:
+        subset_str='pats'
+        for criteria,v in args.criteria_dict.items():
+            subset_str+='_{}{}'.format(criteria,v)
+
+    val_pct_st=args.val_prop if not args.train_only else 0
+    test_pct_st=args.test_prop if not args.train_only else 0
+    hpt_dir='e{}_p{}_lr{}_vpct{}_tpct{}_stretch{}_b{}'.format(args.epochs,args.patience,args.lr,val_pct_st,test_pct_st,args.stretch_pct,args.batch_size)
+
 
     model_str="{}_{}_{}_{}_{}".format(hgcn_str,feat_str,c_str,inp_str,dp_str)
-    specific_dir=os.path.join(args.task,subset_str,"L{}".format(args.output_dim),model_str)
+    specific_dir=os.path.join(args.task,subset_str,"L{}".format(args.output_dim),model_str,hpt_dir)
     full_dir=os.path.join(meg_dir,specific_dir)
     print(model_str,'model')
     return full_dir
@@ -110,7 +119,7 @@ def create_objective_fun(args,tunable_param_fn):
 
 
     def objective_fn(trial):
-        args_copy = copy.deepcopy(args) ### 
+        args_copy = copy.deepcopy(args) ### s
         print('start TRIALLLLLL \n\n\n')
         print('Args')
         # print(len(args_copy.eucl_vars))
@@ -155,13 +164,15 @@ def complete_study_one_arg(args,n,erase_empty=True):
     this will run the a study of trains n times
     for one static set of args
     """
+    print()
+    print()
     create_study_output_dir(args)
     setattr(args,'study_dir',create_study_output_dir(args))
     print(args.study_dir,'study dir')
     # assert os.path.exists(args.study_dir)
 
     path=args.study_dir
-    # path=r"C:\Users\coleb\OneDrive\Desktop\Fall 2021\Neuro\hyperBrain\study\meg\L3\HGCN_novirt_0.54c_id"
+    # path=r"C:\Users\coleb\OneDrive\Des\Fall 2021\Neuro\hyperBrain\study\meg\L3\HGCN_novirt_0.54c_id"
     if os.path.exists(path):
         print(os.path.exists(path),'exists for sure')
         print(os.listdir(path))
@@ -173,23 +184,32 @@ def complete_study_one_arg(args,n,erase_empty=True):
             subdir_path=os.path.join(path,sd)
             subdir_files=os.listdir(subdir_path)
 
-            # if 'finish_train.txt' in subdir_files:
-            #     competed.append(sd)
+            # if 'final_model.pth' in subdir_files:
+            if 'finish_train.txt' in subdir_files:
+                competed.append(sd)
+
+                save_embeddings(subdir_path,overwrite=False)
             # else:
             #     shutil.rmtree( subdir_path )
         num_completed=len(competed)
     else:
         num_completed=0
-    # return
-
+    # returns
+    print('we are in here??')
     n_trials=n-num_completed
     if n_trials<=0:
-        return args.study_dir
-    for n in range(n_trials):
-        # print(n,'')
-        args_copy = copy.deepcopy(args)
-        args_copy.save_dir = get_dir_name(args.study_dir)
-        train_inductive.train(args_copy)
+        print('negative trials')
+        pass
+    else:
+        for n in range(n_trials):
+            # print(n,'')
+            args_copy = copy.deepcopy(args)
+            print(args.study_dir,'study directory!')
+            args_copy.save_dir = get_dir_name(args.study_dir)
+            train_inductive.train(args_copy)
+
+    save_embeddings_all(args.study_dir)
+
     return args.study_dir
 
 if __name__ == '__main__':
