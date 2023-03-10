@@ -13,7 +13,7 @@ import optimizers
 import torch
 import torch as th
 from config import parser
-from models.base_models import NCModel, LPModel
+from models.base_models import LPModel
 from utils.data_utils import load_data
 from utils.train_utils import get_dir_name, format_metrics
 from utils.dataloader_utils import load_data_graphalg,load_dataset
@@ -36,14 +36,13 @@ def train(args):
         if not args.save_dir:
             dt = datetime.datetime.now()
             date = f"{dt.year}_{dt.month}_{dt.day}"
-            try:
-                models_dir = os.path.join(os.environ['LOG_DIR'], args.task, date)
-            except:
-                
-                models_dir = os.path.join(os.path.join(os.getcwd(),'logs'), args.dataset,args.task, date)
+            models_dir = os.path.join(os.path.join(os.getcwd(),'logs'), args.dataset,args.task, date)
+            
             save_dir = get_dir_name(models_dir)
         else:
             save_dir = args.save_dir
+        with open(os.path.join(save_dir,'begin_train.txt'), 'w') as f:
+            f.write('began')
         logging.basicConfig(level=logging.INFO,
                             handlers=[
                                 logging.FileHandler(os.path.join(save_dir, 'log.txt')),
@@ -67,25 +66,28 @@ def train(args):
     else:
         # fff
         train_loader, dev_loader, test_loader =load_dataset(args,'graph')
+
+
     # print(data,'data')
     # args.n_nodes, args.feat_dim = data['features'].shape
     args.feat_dim = args.num_feature
     # train_loader, dev_loader, test_loader =load_data_graphalg(args)
     if args.task == 'nc':
+        assert False,'Getting rid of all mentions of node first model'
         Model = NCModel
         # args.n_classes = int(data['labels'].max() + 1)
         args.n_classes = args.n_classes
         logging.info(f'Num classes: {args.n_classes}')
     else:
-        Model = LPModel
         # args.nb_false_edges = len(data['train_edges_false'])
         # args.nb_edges = len(data['train_edges'])
-        # if args.task == 'lp':
-        #     Model = LPModel
-        # else:
-        #     Model = RECModel
-        #     # No validation for reconstruction task
-        #     args.eval_freq = args.epochs + 1
+        if args.task in ('lp','ds'):
+            Model = LPModel
+        else:
+            raise Exception('what the hell only lp and ds')
+            Model = RECModel
+            # No validation for reconstruction task
+            args.eval_freq = args.epochs + 1
 
     if not args.lr_reduce_freq:  ### CAREFUL- ACCIDENTALY PUT LR_scheduler step in inner loop, w/ epochs=5 so we shot down
         args.lr_reduce_freq = args.epochs
@@ -94,30 +96,15 @@ def train(args):
 
     # ljbjj
     # Model and optimizer
+    print(Model,'MODEL')
+    print(args,'ARGS')
+    # assert False
     model = Model(args).to(args.device)
     logging.info(str(model))
+    model.dc.freeze()
 
     optimizer_full = getattr(optimizers, args.optimizer)(params=filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr,
                                                     weight_decay=args.weight_decay)
-
-    # model.freeze()
-    model.dc.unfreeze()
-    print(model.dc)
-    print(model.dc.t,'t')
-
-    print(model.dc.parameters())
-    # sssssjsb
-    # if --fermi_freezeone', type=str, default='Niether', choices=['Niether','k', 't'])
-    if args.fermi_use=='full':
-            optimizer_fermi = getattr(optimizers, args.optimizer)(params=model.dc.parameters(), lr=args.lr,
-                                                        weight_decay=args.weight_decay)
-    elif args.fermi_use=='k':
-            optimizer_fermi = getattr(optimizers, args.optimizer)(params=model.dc.r, lr=args.fermi_lr,
-                                                        weight_decay=args.weight_decay)
-    elif args.fermi_use=='t':
-            optimizer_fermi = getattr(optimizers, args.optimizer)(params=model.dc.t, lr=args.fermi_lr,
-                                                        weight_decay=args.weight_decay)
-    model.dc.freeze()
 
     optimizer=optimizer_full
     # optimizer = getattr(optimizers, args.optimizer)(params=model.parameters(), lr=args.lr,
@@ -163,26 +150,8 @@ def train(args):
 
     for epoch in range(args.epochs): ## eventually check  if this randomizes so we can go with shorter epochs..
         # if show_fermi_post:
-            # print('FERMI OPTIM')
-            # print(model.dc.r.item(),model.dc.t.item(),'FERMI epoch:',epoch)
-            # model.freeze()
-            # model.dc.unfreeze()
-        show_fermi_post=False
-        if (fermi_freq>0) and ((epoch+1) % fermi_freq==0):
-            # print('FERMI OPTIM')
-            print(model.dc.r.item(),model.dc.t.item(),'FERMI (adjusting) epoch:',epoch)
-            model.freeze()
-            model.dc.unfreeze()
-            optimizer= optimizer_fermi
-            # lr = 
-            show_fermi_post=True
-
-        else:
-            # if show_fermi_post:
-            print(model.dc.r.item(),model.dc.t.item(),'FERMI (non-adjusting) epoch:',epoch,'LR: ',lr_scheduler.get_last_lr())
-            model.unfreeze()
-            model.dc.freeze()
-            optimizer= optimizer_full
+        print(model.dc.r.item(),model.dc.t.item(),'FERMI (non-adjusting) epoch:',epoch,'LR: ',lr_scheduler.get_last_lr())
+        optimizer= optimizer_full
 
         print(model.c,'MODEL C')
 
@@ -192,48 +161,15 @@ def train(args):
         print('reset')
         t = time.time()
         print(len(train_loader),'train length')
+
         for i, data in enumerate(train_loader):
             optimizer.zero_grad()
-
-
-            # print(i,len(train_loader))
-            # for 
 
             for x, val in data.items():
                 if torch.is_tensor(data[x]):
                     data[x] = data[x].to(args.device)
                     # data[x]
-            # print(data['graph_id'])
-            # data['features']  = data['features'][0]
-            # data['edges']  = data['edges'][0]
-            # data['edges_false']  = data['edges_false'][0]
-            # data['labels']  = data['labels'][0]
-            # data['adj_prob']  = data['adj_prob'][0]
-            # if len(data['edges_false'][0])==0:
-            #     continue  ## one protein has no flarnking negative edge. just fully connected 
-
-            # data['adj_mat']  =  data['adj_mat'].to_dense()[0].to_sparse()
             data['adj_mat']  =  data['adj_mat'].to_dense()
-            # data['adj_train_norm']  =  data['adj_mat']
-
-            # if data['graph_id'][0] in args.frech_B_dict:
-            #     # print('reusable')
-            #     args.frechet_B=args.frech_B_dict[data['graph_id'][0]]
-            # else:
-            #     args.frechet_B=frechet_B(data['adj_train_norm'])
-                
-            #     args.frech_B_dict[data['graph_id'][0]]=args.frechet_B
-            # # data['adj_mat']  =  data['adj_mat'].to_sparse()
-            # edges_false = data['edges_false']
-            # # print(edges_false,'false edge ')
-            # edges_false_dict ={'train':{}}
-            # split='train'
-
-            # data['false_dict']=edges_false_dict[split]
-            # print('new item')
-            # print(data['adj_mat'])
-            # print(edges_false.shape,'fasle')
-            # print(data['adj_mat'].shape)
             batch_size=data['features'].shape[0]
             embeddings_list=[]
             data_list=[]
@@ -243,16 +179,7 @@ def train(args):
                 # _,data_i=run_data_single(data, i,model,skip_embedding=True)
                 embeddings_list.append(embeddings)
                 data_list.append(data_i)
-            # print(len(data_list),'LEN DATA LIS')
-            # optimizer.zero_grad()
-            # embeddings_list,_= run_data_batch(data,model)
-            # embeddings=embeddings_list[0]  ### just for saving?? get rid of this shit
 
-            # run_data_batch, return stacked embedding (ie. embedding_list and processed data ie. data_list)
-
-
-            train_metrics=model.compute_metrics_multiple(embeddings_list,data_list,'train')
-            train_metrics['loss'].backward()
 
 
             if model.c<.1:
@@ -263,48 +190,9 @@ def train(args):
                 print(model.c)
                 model.c=torch.clip(model.c,0.02)
 
+            train_metrics=model.compute_metrics_multiple(embeddings_list,data_list,'train')
+            train_metrics['loss'].backward()
 
-            # print(train_metrics['loss'],'BIG LOSS')
-            # batch_losses=torch.zeros((batch_size))
-            # embeddings = model.encode(data['features'].to(args.device), data['adj_mat'].to(args.device))
-            # print(embeddings.shape,embeddings.type(),'output!!!')
-            
-            # train_metrics = model.compute_metrics(embeddings, data, 'train')
-            # train_metrics=model.compute_metrics_multiple([embeddings],[data],'train')
-
-            ##update epoch metrics--- 
-            # model.update_epoch_stats(embeddings, data, 'train') 
-            # if not use_batch:
-            #     try:
-            #         train_metrics['loss'].backward()
-            #     except:
-            #         model.compute_metrics(embeddings, data, 'train',verbose=True)
-            # else:
-            #     print(batch_loss,'batch!')
-            #     if batch_count==0:
-            #         batch_loss=train_metrics['loss']
-            #     else:
-            #         batch_loss+=train_metrics['loss']
-                
-            #     print(batch_count,'count')
-            #     batch_losses[batch_count]=train_metrics['loss']
-            #     print(batch_losses,'losses')
-
-            #     batch_count+=1
-                
-            #     print(batch_count,batch_size,'bathc count')
-            #     if batch_count==batch_size:
-            #         total_batch_loss=torch.mean(batch_losses)
-            #         # total_batch_loss=batch_loss/float(batch_size)
-            #         print(total_batch_loss,'TOTS LOSS')
-
-            #         # total_batch_loss.backward(retain_graph=True)
-            #         batch_count=0
-            #         batch_loss=0
-            #         batch_losses=torch.zeros((batch_size))
-
-
-            # loss.backward(retain_graph=True)
             if args.grad_clip is not None:
                 max_norm = float(args.grad_clip)
                 all_params = list(model.parameters())
@@ -323,20 +211,7 @@ def train(args):
             # if True:
                 avg_stats,stat_string = model.report_epoch_stats()
                 print(stat_string)
-                # break
-                # break
 
-                # break
-            #     evaluate(epoch, dev_loader, 'dev', model)
-
-            # if model.epoch_stats['num_graphs'] % 10 ==0:
-            #     evaluate(epoch, dev_loader, 'dev', model)
-            # break
-        # print('broekn!')
-        # continue
-        # lr_scheduler.step()
-        # if batch_loss>0:
-            # batch_loss.backward()
         epoch_stats,stat_string = model.report_epoch_stats()
         # evaluate(epoch, dev_loader, 'dev', model)
         # if (epoch + 1) % args.log_freq == 0:
@@ -356,13 +231,21 @@ def train(args):
         # if (epoch + 1) % args.eval_freq == 0:
         if True:
             print('training epoch done in ', 'time: {:.4f}s'.format(time.time() - t))
-            val_metrics,val_embeddings,val_string = evaluate(epoch, dev_loader, 'dev', model,freeze=True)
-            test_metrics,test_embeddings,test_string = evaluate(epoch, test_loader, 'test', model,freeze=False)
-            # print(val_metrics,val_embeddings ,'val')
-            # print(test_metrics,test_embeddings,'test')
-            # if (epoch + 1) % args.log_freq == 0:
-            logging.info(" ".join(['Dev','Epoch: {:04d}'.format(epoch + 1), val_string]))
-            logging.info(" ".join(['Test','Epoch: {:04d}'.format(epoch + 1), test_string]))
+            if args.train_only:
+                print('No validation data, using training for best model decision.')
+                val_metrics=epoch_stats
+                test_metrics=epoch_stats
+                val_string=stat_string
+                test_string=stat_string
+            else:
+                val_metrics,val_embeddings,val_string = evaluate(epoch, dev_loader, 'dev', model)
+                test_metrics,test_embeddings,test_string = evaluate(epoch, test_loader, 'test', model)
+                # print(val_metrics,val_embeddings ,'val')
+                # print(test_metrics,test_embeddings,'test')
+                # if (epoch + 1) % args.log_freq == 0:
+                logging.info(" ".join(['Dev','Epoch: {:04d}'.format(epoch + 1), val_string]))
+                logging.info(" ".join(['Test','Epoch: {:04d}'.format(epoch + 1), test_string]))
+
             if model.has_improved(best_val_metrics, val_metrics):
                 best_test_metrics = test_metrics
                 best_test_string = test_string
@@ -427,6 +310,15 @@ def train(args):
         json.dump(vars(args_to_save), open(os.path.join(save_dir, 'config.json'), 'w'))
         torch.save(model.state_dict(), os.path.join(save_dir, 'model.pth'))
         logging.info(f"Saved model in {save_dir}") ### do we need to save logs or what???
+
+        with open(os.path.join(save_dir,'finish_train.txt'), 'w') as f:
+            f.write('finished')
+
+        # data_loader_tups=[('train',train_loader),('val',dev_loader),('test',test_loader)]
+        scan_info_outpath = os.path.join(save_dir,'scan_info.csv')
+        embeddings_outdir = os.path.join(save_dir,'embeddings')
+        # create_embeddings(model,data_loader_dicts,scan_info_outpath,embeddings_outdir)
+
     # return best_val_metrics,best_test_metrics
     print(best_val_metrics)
     print(best_val_metrics['loss'],'val mets')
@@ -458,7 +350,7 @@ def run_data_batch(data,model):
 
         else:
             frech_B=frechet_B(gid)
-        # print(frech_B)
+        # print(frech_B)e
         model.args.frech_B_list.append(frech_B)
 
     # assert -1 not in data_i['edges']
@@ -477,7 +369,9 @@ def run_data_batch(data,model):
 
    
 def run_data_single(data, index,model,skip_embedding=False,no_grad=False):
-
+    """
+    this is a very weird and sloppy pattern
+    """
     data_i={}
     for k,vals in data.items():
         data_i[k]=vals[index]
@@ -511,82 +405,16 @@ def run_data_single(data, index,model,skip_embedding=False,no_grad=False):
             embeddings = model.encode(data_i['features'].to(model.args.device), data_i['adj_mat'].to(model.args.device))
     else:
         embeddings = model.encode(data_i['features'].to(model.args.device), data_i['adj_mat'].to(model.args.device))
-    # train_metrics = model.compute_metrics(embeddings, data_i, 'train')
-    # # train_metrics['loss'].backward()  #### NOT YET!
 
-    # # loss.backward(retain_graph=True)
-    # if args.grad_clip is not None:
-    #     max_norm = float(args.grad_clip)
-    #     all_params = list(model.parameters())
-    #     for param in all_params:
-    #         torch.nn.utils.clip_grad_norm_(param, max_norm)
-    # optimizer.step()
-    # model.update_epoch_stats(train_metrics, 'train')         
-    # if model.epoch_stats['num_graphs'] % 23 ==0:
-    # # if True:
-    #     avg_stats,stat_string = model.report_epoch_stats()
-    #     print(stat_string)
     return embeddings,data_i
 
-def evaluate(epoch, data_loader, prefix, model,freeze=True):
+def evaluate(epoch, data_loader, prefix, model):
     # print('EVALUATE \n\n\n\n\n ')
     model.eval()
     setattr(model.args,'currently_training',False)
-    # if freeze:
-    #     model.freeze()
-    # else:
-    #     print('model not frozen!')
-    #     model.unfreeze()
-    model.freeze()
     with torch.no_grad():
-        # print('EVAL GOING IN')
-        # print([m for m in model.parameters()]) 
         model.reset_epoch_stats(epoch, prefix)
-        # print('EVAL GOING IN')
-        # print([m for m in model.parameters()]) 
         for i, data in enumerate(data_loader):
-            # for x, val in data.items():
-                # if torch.is_tensor(data[x]):
-                    # data[x] = data[x].to(model.args.device)
-
-
-            # data['features']  = data['features'][0]
-            # data['edges']  = data['edges'][0]
-            # data['edges_false']  = data['edges_false'][0]
-            # data['adj_mat']  =  data['adj_mat'].to_dense()[0].to_sparse()
-            # data['adj_train_norm']  =  data['adj_mat']
-            # data['labels']  = data['labels'][0]
-            # edges_false = data['edges_false']
-            # # print(edges_false,'false edge ')
-            # split = 'train'
-            # edges_false_dict={'train':{}}
-            # for n1,n2 in edges_false:
-            #     n1= n1.item()
-            #     n2=n2.item()
-            #     # print(n1,'AH')
-            #     if n1 not in edges_false_dict[split]:
-            #         edges_false_dict[split][n1]=set([])
-            #     if n2 not in edges_false_dict[split]:
-            #         edges_false_dict[split][n2]=set([])
-            #     edges_false_dict[split][n2].add(n1)
-            #     edges_false_dict[split][n1].add(n2)
-            # data['false_dict']=edges_false_dict[split]
-
-            # if data['graph_id'][0] in model.args.frech_B_dict:
-            #     # print('reusable')
-            #     model.args.frechet_B=model.args.frech_B_dict[data['graph_id'][0]]
-            # else:
-            #     model.args.frechet_B=frechet_B(data['adj_train_norm'])
-                
-            #     model.args.frech_B_dict[data['graph_id'][0]]=model.args.frechet_B
-
-            # data['adj_mat']  =  data['adj_mat'].to_sparse()
-            # print('eval')
-            # print(data['features'].shape,'features  type 3')
-            # print(data['adj_mat'].shape,'norm type 3')
-            # print(len(data['edges_false']),'false edges')
-            # if len(data['edges_false'])==0:
-                # continue  ## one protein has no flarnking negative edge. just fully connected 
             data['adj_mat']  =  data['adj_mat'].to_dense()
             embeddings,data_i=run_data_single(data, 0,model,no_grad=False)
             # embeddings = model.encode(data['features'], data['adj_mat']) ### don't forget this still just gets one set of embeddings

@@ -59,7 +59,9 @@ def preprocess(args):
         args.data_root=default_dataroot
     # else:
         # download_MEG = args.raw_scan_file
-
+    if args.train_only:
+        setattr(args,'task','ds')
+        assert args.task=='ds', 'Training with no validation with task: {} . only use with ds (for downstream tasks)'.format(args.task)
     atlas_file = args.raw_atlas_file
     download_MEG = args.raw_scan_file
     download_clinical=args.raw_clinical_file
@@ -74,10 +76,13 @@ def preprocess(args):
     val_subgroup = 1 if hasattr(args,'val_sub') and args.val_sub==1 else 0
     criteria_dict= args.criteria_dict if  hasattr(args,'criteria_dict') else {}
     val_pct = .95 if args.train_only else getattr(args,'val_prop')
+
     # use_exclude=False if ((args.train_only) or (val_subgroup>0)) else True
     use_exclude=False
-    raw_data,idxs_dict = dataset_split(download_clinical,download_MEG,
-         getattr(args,'val_prop'),getattr(args,'test_prop'),val_subgroup,use_exclude,criteria_dict=criteria_dict)
+    # raw_data,idxs_dict = dataset_split(download_clinical,download_MEG,getattr(args,'val_prop'),getattr(args,'test_prop'),val_subgroup,use_exclude)
+
+    raw_data,idxs_dict = dataset_split(download_clinical,download_MEG,getattr(args,'val_prop'),getattr(args,'test_prop'),criteria_dict,use_exclude)
+
 
     if (hasattr(args,'train_noise_level')) and (args.train_noise_level)>0:
         train_noise_level=(args.train_noise_level)
@@ -109,28 +114,8 @@ def preprocess(args):
             data_dict = graph_data_dict_recursive(args,scan,clinical,label_names,
                 atlas=atlas,norm_functions=norm_functions,noise_num=train_noise_num,noise_level=train_noise_level)
 
-            # edges,feats,labels,adj_prob,adj_noise = to_graph(args,scan,clinical,label_names,atlas=atlas,norm_functions=norm_functions)
-
-            # labels = np.array(labels).astype(float)
-            # feats = np.array(feats).astype(float)
 
             print(len(data_dict['edges']))
-
-            # data_dict= {
-            #     'targets': labels.tolist(),
-            #     'edges': edges,
-            #     'node_features': feats.tolist(),
-            #     'graph_id': str(clinical['Scan Index']),
-            #     'adj_prob': adj_prob.tolist(),
-            #     'noise_data':[]}
-
-            # print(data_dict_test,'testerr')
-            # print(data_dict,'old')
-            # print(data_dict_test['noise_data'][0]['edges']==data_dict_test['edges'])
-            # print([len(data_dict_test['noise_data'][i]['edges'])  for i in range(train_noise_num)] ,'before')
-            # print(len(data_dict_test['edges']),'before')
-            # # print(len(data_dict_test['noise_data']))
-            # print(data_dict['node_features'])
             num_feats=len(data_dict['node_features'][0])+1  ### to set args below
             # print(num_feats)  ## probably should just do this at start sum up numbers for each use__ and then add firt
             processed_data[section].append(data_dict)
@@ -273,6 +258,16 @@ def to_graph(args,scan,clinical,label_names,atlas,norm_functions={},return_label
     # new_adjusted = (adj_flat-np.min(adj_flat))/(np.max(adj_flat)-np.min(adj_flat))
     # new_adjusted_clipped = (adj_flat-np.percentile(adj_flat,5))/(np.percentile(adj_flat,95)-np.percentile(adj_flat,5))
     # new_adjusted_clipped=np.clip(new_adjusted_clipped,0,1)
+    # print(args,'ARGS')
+    if args.stretch_pct<1:
+        args.stretch_pct=args.stretch_pct*100
+    if hasattr(args,'normalize_id_treatment'):
+        id_treatment=args.normalize_id_treatment
+    else:
+        # this was how we did it before creating argument
+        id_treatment='raw'
+    # print(args.normalize_id_treatment)
+    # akakak
     adj_flat=[]
     for j in range(single_scan.shape[0]):
         for k in range(j+1, single_scan.shape[0]):
@@ -280,6 +275,14 @@ def to_graph(args,scan,clinical,label_names,atlas,norm_functions={},return_label
     # print(norm_functions.keys(),'final')
     # print(norm_functions['mm_strech'])
     adj_prob_transform='0_1_95th'
+
+    # adj_prob_transform='0_1_100th'
+    if hasattr(args,'stretch_loss'):
+        plv_stretch_loss_pct=args.stretch_loss
+    else:
+        # this was how we did it before creating argument
+        plv_stretch_loss_pct=95
+
     if adj_prob_transform  in ('None',None) or norm_functions=={}:
         # raise Exception('CANNOT LEAVE PROB METRIX UNATTENDED LIKE THAT')
         print('CANNOT LEAVE PROB METRIX UNATTENDED LIKE THAT')
@@ -287,14 +290,14 @@ def to_graph(args,scan,clinical,label_names,atlas,norm_functions={},return_label
     else:
 
         if adj_prob_transform=='0_1_95th':
-            adj_prob=norm_functions['mm_strech'](single_scan,mm_min_pct=5,mm_max_pct=95,mm_clip_data=True,identity_treatment='Raw') ## seems like set to max is already covered
+            adj_prob=norm_functions['mm_strech'](single_scan,mm_min_pct=100-plv_stretch_loss_pct,mm_max_pct=plv_stretch_loss_pct,mm_clip_data=True,identity_treatment=id_treatment) ## seems like set to max is already covered
             # adj_prob=norm_functions['mm_strech'](single_scan,mm_min_pct=5,mm_max_2ct=95,mm_clip_data=True,identity_treatment='set_to_max')
             # print(adj_flat)
 
             # adj_prob = (single_scan-np.percentile(adj_flat,5))/(np.percentile(single_scan,95)-np.percentile(adj_flat,5))
             # adj_flat_adj =(adj_flat-np.percentile(adj_flat,5))/(np.percentile(adj_flat,95)-np.percentile(adj_flat,5))
         elif adj_prob_transform=='0_1_100th':
-            adj_prob=norm_functions['mm_strech'](single_scan,mm_min_pct=0,mm_max_pct=100,mm_clip_data=True,identity_treatment='Raw')
+            adj_prob=norm_functions['mm_strech'](single_scan,mm_min_pct=0,mm_max_pct=100,mm_clip_data=True,identity_treatment=id_treatment)
 
     # print(add_noise,'how much noise?')
     # print(adj_prob[0],'prob 1')
@@ -344,13 +347,15 @@ def to_graph(args,scan,clinical,label_names,atlas,norm_functions={},return_label
         if hasattr(args,'plv_pca_dim') and args.plv_pca_dim>0:
             feats=norm_functions['pca_transform'](single_scan)
         else:
+            # this CERTAINLY should not be called stretch pct.. but for now, that's what's in all the configs
+            # 
             max_scan=np.max(adj_flat)
             if hasattr(args,'stretch_pct'):
-                stretch_pct=args.stretch_pct
+                plv_input_selfpct=args.stretch_pct
             else:
-                stretch_pct=95
+                plv_input_selfpct=95
 
-            feats=norm_functions['ms_norm'](feats,mm_clip_data=False,identity_treatment='set_to_pct',percentile_to_set=stretch_pct)
+            feats=norm_functions['ms_norm'](feats,mm_clip_data=False,identity_treatment='set_to_pct',percentile_to_set=plv_input_selfpct)
         feats=feats.astype(float)
         feat_list.append(feats)
         print(feats.std(),'new standard')
@@ -569,20 +574,18 @@ def get_edges(G,bi_directional=False):
     return edges
 
 # def 
-def get_scan_index_split_bygroup(clinical_data,in_group):
-    print(in_group)
-    criteria = (clinical_data['Scan Index'].isin(in_group))
-    clinical_val=clinical_data[~criteria]
+def get_scan_index_split_bygroup(clinical_data,CogTR_group,diagnosis_group):
+    if CogTR_group>0 and diagnosis_group>0:
+        criteria = ((clinical_data['diagnosis']==diagnosis_group)&(clinical_data['CogTr']==CogTR_group))
+    elif CogTR_group>0:
+        criteria=(clinical_data['CogTr']==CogTR_group)
+    elif diagnosis_group>0:
+        criteria=(clinical_data['diagnosis']==diagnosis_group)
+    else:
+        raise Exception('Need to give us something!')
     clinical_train=clinical_data[criteria]
-
-    print(clinical_val.shape)
-    print(clinical_train.shape)
-
-    # sjskg
-    val_idx=clinical_val['Scan Index'].values[2:].astype(int).tolist()
-    test_idx=clinical_train['Scan Index'].values[0:2].astype(int).tolist()
-    return val_idx,test_idx
-
+    train_idx=clinical_train['Scan Index'].astype(int).tolist()
+    return train_idx,train_idx
 
     # clinical_train=clinical_data[~criteria]
 
@@ -609,10 +612,16 @@ def get_scan_index_patient_split(clinical_data,val_pct,test_pct,pat_col = 'ID',u
     test_ids= set()
     test_idx = []
 
+    print(val_pct,'val pct')
+    print(test_pct,'test_pct')
+    
+    val_pct=float(val_pct)
+    test_pct=float(test_pct)
     n_val = len(pats_full)*val_pct*2
     n_tests = len(pats_full)*test_pct*2
     print(n_val,'NUM VAL')
     print(len(pats))
+
     if n_val+n_tests>len(pats_full)*2:
         raise Exception('not enough to go around')
     while len(valid_idx)<n_val:
@@ -652,46 +661,38 @@ def download_atlas(atlas_file):
     # asser
     # ss
     return atlas
-def dataset_split(download_clinical,download_MEG,val_pct=.2,test_pct=.1,val_subgroup=False,use_exclude=False,criteria_dict={}):
+def dataset_split(download_clinical,download_MEG,val_pct=.2,test_pct=.1,criteria_dict={},use_exclude=False):
     print('reading data...')
 
     clinical_data = pd.read_csv(download_clinical)
+
+    print(criteria_dict)
+    # add new args here (possibly related to the commented out code below)
+    # this should let you decide whether whether to use the non
+    for criteria,val in criteria_dict.items():
+        clinical_data=clinical_data[clinical_data[criteria]==val]
+
+    print(clinical_data.shape,'CLINICAL SHAPE??')
     scan_data = np.load(download_MEG)  ### here is where we find the norm.. return norm function?
     # load validation dataset
     # valid_idx,test_idx =get_scan_index_patient_split(clinical_data,val_pct,test_pct)
     # print(valid_idx,'VALID')
-    print(use_exclude,'USE EXCLUDE')
-    print(val_subgroup,'USE Val')
-    # assert False
-    clinical_data_old=clinical_data
-    for criteria,val in criteria_dict.items():
-        clinical_data=clinical_data[clinical_data[criteria]==val]
+    # print(use_exclude,'USE EXCLUDE')
+    
+    # if val_subgroup_tups:
+    #     print('SUB GROUP')
+    #     print('subgroups given, go')
+    #     valid_idx,test_idx =get_scan_index_split_bygroup(clinical_data)
 
-
-    # if not val_subgroup:
-    #     for criteria,val in criteria_dict.items():
-    #         clinical_data=clinical_data[clinical_data[criteria]==val]
-    # print(val_subgroup,'VAL SUBGROUP??')
-    # assert False
-
-    if val_subgroup:
-        assert criteria_dict
-        print('SUB GROUP')
-        valid_idx,test_idx =get_scan_index_split_bygroup(clinical_data_old,in_group=clinical_data['Scan Index'].unique())
-        all_scanids=clinical_data_old['Scan Index'].astype(int).tolist()
-        print(valid_idx,'VALID INDEX')
-        clinical_data=clinical_data_old
-    else:
-        for criteria,val in criteria_dict.items():
-            clinical_data=clinical_data[clinical_data[criteria]==val]
-        print('Traditional split')
-        valid_idx,test_idx =get_scan_index_patient_split(clinical_data,val_pct,test_pct,use_exclude=use_exclude)
-        all_scanids = clinical_data['Scan Index'].astype(int).tolist()
+    # else:
+    #     print('Traditional split')
+    valid_idx,test_idx =get_scan_index_patient_split(clinical_data,val_pct,test_pct,use_exclude=use_exclude)
     
 
     print('\n\n now')
     print(valid_idx)
 
+    all_scanids = clinical_data['Scan Index'].astype(int).tolist()
     train_idx = (set(all_scanids)-set(test_idx))-set(valid_idx)
     train_idx=list(train_idx)
     # print(valid_idx,test_idx)
@@ -699,12 +700,15 @@ def dataset_split(download_clinical,download_MEG,val_pct=.2,test_pct=.1,val_subg
     # print()
     assert (len(train_idx)+len(valid_idx)+len(test_idx))==len(all_scanids)
     print(len(train_idx),len(valid_idx),len(test_idx),'lengths')
-    print((len(set(train_idx))+len(set(valid_idx))+len(set(test_idx))),'unique lenths')
-    
+    # print(s)
+    # sss
+    # sss
     file_count=0
     raw_data = {'train': [], 'valid': [], 'test': [],'all':[]} # save the train, valid dataset.
 
-    train_idx=list(train_idx)+list(test_idx)
+    # cole. I HATE YOU. you are such a piece of shit.
+    # train_idx=list(train_idx)+list(test_idx)
+
     idxs_dict = {'train': train_idx, 'valid': valid_idx, 'test': test_idx,'all':all_scanids}
     # for i, data_item in enumerate(all_data):
     print(len(train_idx),len(valid_idx),len(test_idx),'lengths after add test to train')
@@ -826,7 +830,7 @@ def create_norm_functions(args):    ##identity options, set to 0, set to 1, set 
         return scan
 
 
-    def mm_strech(scan,mm_min_pct=5,mm_max_pct=95,mm_clip_data=True,mm_clip_range=(0,1),identity_treatment='Raw',data_flat=data_flat,invert=False):  ## if you change data_flat to a single scan flat, you can retrofit to single norms
+    def mm_strech(scan,mm_min_pct=5,mm_max_pct=95,mm_clip_data=True,mm_clip_range=(0,1),identity_treatment='raw',data_flat=data_flat,invert=False):  ## if you change data_flat to a single scan flat, you can retrofit to single norms
         scan=deepcopy(scan)
         if identity_treatment=='raw':
             pass
@@ -839,18 +843,19 @@ def create_norm_functions(args):    ##identity options, set to 0, set to 1, set 
         data_flat_use=1/data_flat if invert else data_flat
         scan_use = 1/scan if invert else scan
 
+        print(mm_min_pct,mm_max_pct,'min to max?')
+        # sslls
+
 
         adj_prob = (scan_use-np.percentile(data_flat_use,mm_min_pct))/((np.percentile(data_flat_use,mm_max_pct)-np.percentile(data_flat_use,mm_min_pct)))
-
-
-        # print(adj_prob.min(),adj_prob.max(),'min, max')
         if mm_clip_data:
             adj_prob=np.clip(adj_prob,mm_clip_range[0],mm_clip_range[1])
         # plt.hist(adj_prob.flatten(),bins=28)
         # plt.show()
+        # slslsl
         return adj_prob
 
-    def ms_norm(scan,mm_clip_data=False,mm_clip_range=(0,1),identity_treatment='Raw',percentile_to_set=95,data_flat=data_flat):
+    def ms_norm(scan,mm_clip_data=False,mm_clip_range=(0,1),identity_treatment='raw',percentile_to_set=95,data_flat=data_flat):
 
         data_flat=data_flat
         # data_mean=

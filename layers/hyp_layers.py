@@ -238,10 +238,10 @@ class HypAgg(Module):
     def forward(self, x, adj):
         self.most_recent={}
         self.most_recent['in']=x
-        if not self.use_agg:
-            self.most_recent['out']=x
-            # print('ignored!!!')
-            return x
+        # if not self.use_agg:
+        #     self.most_recent['out']=x
+        #     # print('ignored!!!')
+        #     return x
         # print('not ignored')
         x_tangent = self.manifold.logmap0(x, c=self.c)
         if self.use_att:

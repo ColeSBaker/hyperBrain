@@ -4,6 +4,7 @@ import argparse
 import os
 
 #options (lp,ds) only difference is train_only vs true validation
+#TODO undo the way task controls other things... what if we want to change them?
 task='ds'  
 # looks silly but we reuse in "change_task"
 task_to_train_only={'lp':0,'ds':1}
@@ -138,7 +139,8 @@ def add_params(parser):
     parser.add_argument('--grad-clip', type=float, default=100)
     parser.add_argument('--min-epochs', type=int, default=2)
 
-    parser.add_argument('--stretch_pct', type=int, default=98)
+    parser.add_argument('--stretch_pct', type=int, default=95)
+    parser.add_argument('--stretch_loss', type=int, default=95)
 
 
     ##model_config
@@ -167,7 +169,7 @@ def add_params(parser):
     parser.add_argument('--use_frechet_agg', type=int, default=1)
     # parser.add_argument('--train_only', type=int, default=train_only)  #### now the one with val stuff.
     parser.add_argument('--use_val', type=int, default=1) 
-    parser.add_argument('--val_sub', type=int, default=0) 
+    parser.add_argument('--val_sub', type=int, default=1) 
 
     parser.add_argument('--train_noise_level', type=int, default=.01) 
     parser.add_argument('--train_noise_prob', type=int, default=.5) 

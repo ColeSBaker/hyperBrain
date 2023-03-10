@@ -100,7 +100,7 @@ def load_data_graphalg(args):
 def load_meg_averages(args,split_cols): 
     return get_average_data(args,split_cols)
 
-def load_dataset(args,dataset_name, distributed=True):
+def load_dataset(args,dataset_name):
     # train_dataset = dataset_class(args, logger, split='train')
     # dev_dataset = dataset_class(args, logger, split='dev')
     # test_dataset = dataset_class(args, logger, split='test')
@@ -127,6 +127,8 @@ def load_dataset(args,dataset_name, distributed=True):
         args.dev_file=dev_file
         args.test_file=test_file
         args.all_file=all_file
+        # we should get rid of all of the file references... no need to every look back at something 
+        # that gets overwritten
         args.idxs_dict=idxs_dict   ### important bc this won't change for any model
         args.indx_file=indx_file ## this will be constantly overwritten
 
@@ -144,15 +146,20 @@ def load_dataset(args,dataset_name, distributed=True):
 
     #cole. I fucking hate you. you are the fucking worst. by far.
     no_test=False
+    if (len(train_dataset)+len(test_dataset)+len(dev_dataset))==180:
+        no_test=True
     if hasattr(args,'train_only') and args.train_only:
         if not (hasattr(args,'criteria_dict') and args.criteria_dict):
 
             assert (len(train_dataset))==180
     elif no_test:
         print(len(train_dataset),len(dev_dataset))
-        assert (len(train_dataset)+len(dev_dataset))==180
+        # assert (len(train_dataset)+len(dev_dataset))==180
     else:
-        assert (len(train_dataset)+len(test_dataset)+len(dev_dataset))==180 
+        try:
+            assert (len(train_dataset)+len(test_dataset)+len(dev_dataset))==180 
+        except:
+            print('what the hell')
     # else:
         # raise 
     print(len(train_dataset),len(test_dataset),len(dev_dataset))

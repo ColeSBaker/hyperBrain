@@ -17,7 +17,37 @@ import optuna
 import copy
 from utils.train_utils import get_dir_name, format_metrics
 from utils.model_analysis_utils import save_embeddings_all,save_embeddings
+from utils.embedding_utils import multiple_embedding_analysis
 from main import parse_default_args
+
+DATA_ROOT=r'C:\Users\coleb\OneDrive\Desktop\Fall 2021\Neuro\hyperBrain\data\MEG'
+
+
+def ingest_all_embeddings_in_subtree(root):
+    clinical_file=os.path.join(DATA_ROOT,'MEG.clinical.csv')
+    clinical_df = pd.read_csv(clinical_file)
+    template_file = os.path.join(DATA_ROOT,'AALtemplate_balanced.csv')
+    template_df = pd.read_csv(template_file)
+    label_options = {'FN':'Functional Net','SOB':'SOB','FN_SOB':'Func Net SOB','All':'All'}
+    label=label_options['FN']
+    for (subroot,dirs,files) in os.walk(root, topdown=True):
+        print('NEXT LEVEL??')
+    #     print(root,dirs,files)
+        if not dirs :
+            continue
+        embedding_roots=[]
+    #     full_dirs=p
+    #         os.path.join(s,r) for r in os.listdir(s) if '.csv' not in r  and ('.json' not in r) ]
+        for d in dirs:
+            full_dir=os.path.join(subroot,d)
+            subfiles=os.listdir(full_dir)
+            if ('finish_train.txt' in subfiles) or ('model.pth' in subfiles) or ('final_model.pth' in subfiles):
+                embedding_roots.append(full_dir)
+        if embedding_roots:
+            print(subroot,embedding_roots)
+            
+        all_stat_dicts,full_dict,all_stat_dfs,full_stat_df = multiple_embedding_analysis(embedding_roots,clinical_df,label,net_threshold=.29,
+                                       template_df=template_df,save_dir=subroot,suffix='.csv',balanced_atl=True,average=True)
 
 def save_study(args,study):
     ## should adjust to deal name based on stable params?s
@@ -74,11 +104,12 @@ def create_study_output_dir(args):
     #"link_preds"
     #"stats"
     hgcn_str=args.model
-    if args.use_virtual and args.use_weight:
+    
+    if args.use_virtual and args.use_weighted_loss:
         feat_str='full'
-    elif args.use_virtual:
+    elif args.use_weighted_loss:
         feat_str='novirt'
-    elif args.use_weight:
+    elif args.use_virtual:
         feat_str='nowt'
     else:
         feat_str='nowtvirt'
@@ -106,7 +137,9 @@ def create_study_output_dir(args):
 
     val_pct_st=args.val_prop if not args.train_only else 0
     test_pct_st=args.test_prop if not args.train_only else 0
-    hpt_dir='e{}_p{}_lr{}_vpct{}_tpct{}_stretch{}_b{}'.format(args.epochs,args.patience,args.lr,val_pct_st,test_pct_st,args.stretch_pct,args.batch_size)
+    val_str='vpct{}_tpct{}'.format(val_pct_st,test_pct_st) if not args.val_sub else 'val_excl_group'
+
+    hpt_dir='e{}_p{}_lr{}_{}_strchinp{}_strchloss{}_b{}'.format(args.epochs,args.patience,args.lr,val_str,args.stretch_pct,args.stretch_loss,args.batch_size)
 
 
     model_str="{}_{}_{}_{}_{}".format(hgcn_str,feat_str,c_str,inp_str,dp_str)
@@ -185,7 +218,7 @@ def complete_study_one_arg(args,n,erase_empty=True):
             subdir_files=os.listdir(subdir_path)
 
             # if 'final_model.pth' in subdir_files:
-            if 'finish_train.txt' in subdir_files:
+            if ('finish_train.txt' in subdir_files) or ('model.pth' in subdir_files):
                 competed.append(sd)
 
                 save_embeddings(subdir_path,overwrite=False)
@@ -209,6 +242,7 @@ def complete_study_one_arg(args,n,erase_empty=True):
             train_inductive.train(args_copy)
 
     save_embeddings_all(args.study_dir)
+    ingest_all_embeddings_in_subtree(args.study_dir)
 
     return args.study_dir
 
