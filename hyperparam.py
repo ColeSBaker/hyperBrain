@@ -114,7 +114,9 @@ def create_study_output_dir(args):
     else:
         feat_str='nowtvirt'
 
-    if args.use_plv:
+    if args.use_plv and args.use_identity:
+        inp_str='plvid'
+    elif args.use_plv:
         inp_str='plv'
     elif args.use_identity:
         inp_str='id'
@@ -134,12 +136,15 @@ def create_study_output_dir(args):
         subset_str='pats'
         for criteria,v in args.criteria_dict.items():
             subset_str+='_{}{}'.format(criteria,v)
+    batch_str=args.batch_size if args.use_batch else 1
 
     val_pct_st=args.val_prop if not args.train_only else 0
     test_pct_st=args.test_prop if not args.train_only else 0
     val_str='vpct{}_tpct{}'.format(val_pct_st,test_pct_st) if not args.val_sub else 'val_excl_group'
 
-    hpt_dir='e{}_p{}_lr{}_{}_strchinp{}_strchloss{}_b{}'.format(args.epochs,args.patience,args.lr,val_str,args.stretch_pct,args.stretch_loss,args.batch_size)
+    str_loss_str='strchloss{}'.format(args.stretch_loss) if not args.stretch_sigmoid else 'sigloss_{}_{}'.format(args.stretch_r,args.stretch_t)
+    stretch_str='strchinp{}_strchloss{}'.format(args.stretch_pct,args.stretch_loss) 
+    hpt_dir='e{}_p{}_lr{}_{}_strchinp{}_{}_b{}'.format(args.epochs,args.patience,args.lr,val_str,args.stretch_pct,str_loss_str,args.batch_size)
 
 
     model_str="{}_{}_{}_{}_{}".format(hgcn_str,feat_str,c_str,inp_str,dp_str)

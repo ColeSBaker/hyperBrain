@@ -21,9 +21,9 @@ import copy
 from diff_frech_mean.frechet_agg import frechet_B
 
 def train(args):
-    args.seed=1234
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
+    # args.seed=1234
+    # np.random.seed(args.seed)
+    # torch.manual_seed(args.seed)
     args.device= 'cuda' if th.cuda.is_available() else 'cpu'
     if int(args.double_precision):
         torch.set_default_dtype(torch.float64)
@@ -51,7 +51,7 @@ def train(args):
                             ])
 
     logging.info(f'Using: {args.device}')
-    logging.info("Using seed {}.".format(args.seed))
+    # logging.info("Using seed {}.".format(args.seed))
     torch.autograd.set_detect_anomaly(True)
 
     # Load data
@@ -237,6 +237,9 @@ def train(args):
             batch_size=data['features'].shape[0]
             embeddings_list=[]
             data_list=[]
+            # print(data,'DATA')
+            # print(data['features'].shape,'DATA SHAPE!!')
+            # ssksk
 
             for i in range(batch_size):
                 embeddings,data_i=run_data_single(data, i,model)
@@ -537,7 +540,7 @@ def evaluate(epoch, data_loader, prefix, model,freeze=True):
     # else:
     #     print('model not frozen!')
     #     model.unfreeze()
-    model.freeze()
+    # model.freeze()
     with torch.no_grad():
         # print('EVAL GOING IN')
         # print([m for m in model.parameters()]) 

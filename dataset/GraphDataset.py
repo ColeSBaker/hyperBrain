@@ -6,9 +6,7 @@
 # LICENSE file in the root directory of this source tree.
 
 from torch.utils.data import Dataset, DataLoader
-# from torchvision import transforms, utils
 import torch
-from torchvision import transforms
 import numpy as np
 import os
 import math

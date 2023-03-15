@@ -7,9 +7,9 @@
 
 import sys, os
 # sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-from rdkit import Chem
-from rdkit.Chem import rdmolops
-from rdkit.Chem import QED
+# from rdkit import Chem
+# from rdkit.Chem import rdmolops
+# from rdkit.Chem import QED
 from copy import deepcopy
 import glob
 import csv, json
@@ -279,22 +279,20 @@ def to_graph(args,scan,clinical,label_names,atlas,norm_functions={},return_label
             adj_flat.append(single_scan[j, k])
     # print(norm_functions.keys(),'final')
     # print(norm_functions['mm_strech'])
-    adj_prob_transform='0_1_95th'
-    if adj_prob_transform  in ('None',None) or norm_functions=={}:
-        # raise Exception('CANNOT LEAVE PROB METRIX UNATTENDED LIKE THAT')
-        print('CANNOT LEAVE PROB METRIX UNATTENDED LIKE THAT')
-        adj_prob=single_scan
+    if hasattr(args,'stretch_sigmoid') and args.stretch_sigmoid:
+        # adj_prob=norm_functions['ms_sigmoid'](single_scan,.36,.04,identity_treatment='1')
+
+        adj_prob=norm_functions['ms_sigmoid'](single_scan,args.stretch_r,args.stretch_t,identity_treatment='1')
+        # adj_prob=norm_functions['mm_strech'](single_scan,mm_min_pct=100-args.stretch_loss,mm_max_pct=args.stretch_loss,mm_clip_data=True,identity_treatment='Raw') ##
+        # aakkakat
+    # adj_prob_transform='0_1_95th'
+    # if adj_prob_transform  in ('None',None) or norm_functions=={}:
+    #     # raise Exception('CANNOT LEAVE PROB METRIX UNATTENDED LIKE THAT')
+    #     print('CANNOT LEAVE PROB METRIX UNATTENDED LIKE THAT')
+    #     adj_prob=single_scan
     else:
-
-        if adj_prob_transform=='0_1_95th':
-            adj_prob=norm_functions['mm_strech'](single_scan,mm_min_pct=5,mm_max_pct=95,mm_clip_data=True,identity_treatment='Raw') ## seems like set to max is already covered
-            # adj_prob=norm_functions['mm_strech'](single_scan,mm_min_pct=5,mm_max_2ct=95,mm_clip_data=True,identity_treatment='set_to_max')
-            # print(adj_flat)
-
-            # adj_prob = (single_scan-np.percentile(adj_flat,5))/(np.percentile(single_scan,95)-np.percentile(adj_flat,5))
-            # adj_flat_adj =(adj_flat-np.percentile(adj_flat,5))/(np.percentile(adj_flat,95)-np.percentile(adj_flat,5))
-        elif adj_prob_transform=='0_1_100th':
-            adj_prob=norm_functions['mm_strech'](single_scan,mm_min_pct=0,mm_max_pct=100,mm_clip_data=True,identity_treatment='Raw')
+        # adj_prob=norm_functions['ms_sigmoid'](single_scan,.35,.04,identity_treatment='1')
+        adj_prob=norm_functions['mm_strech'](single_scan,mm_min_pct=100-args.stretch_loss,mm_max_pct=args.stretch_loss,mm_clip_data=True,identity_treatment='Raw') ## seems like set to max is already covered
 
     # print(add_noise,'how much noise?')
     # print(adj_prob[0],'prob 1')
@@ -654,7 +652,6 @@ def download_atlas(atlas_file):
     return atlas
 def dataset_split(download_clinical,download_MEG,val_pct=.2,test_pct=.1,val_subgroup=False,use_exclude=False,criteria_dict={}):
     print('reading data...')
-
     clinical_data = pd.read_csv(download_clinical)
     scan_data = np.load(download_MEG)  ### here is where we find the norm.. return norm function?
     # load validation dataset
@@ -808,8 +805,12 @@ def create_norm_functions(args):    ##identity options, set to 0, set to 1, set 
     # # print(np.percentile(data_flat,.75))
 
     print(np.percentile(data_flat,85),'85')
-    
-    # plt.hist(data_flat,bins=30)
+    print(np.percentile(data_flat,90),'90')
+    print(np.percentile(data_flat,95),'95')
+    # data_flat_show=np.clip(data_flat,.2,.65)
+    # plt.hist(data_flat_show,bins=30)
+
+    # here
     # plt.title(args.band+" Original distribution, mean:"+str(round(data_flat.mean(),3)))
     # plt.show()
     # sss
@@ -841,13 +842,73 @@ def create_norm_functions(args):    ##identity options, set to 0, set to 1, set 
 
 
         adj_prob = (scan_use-np.percentile(data_flat_use,mm_min_pct))/((np.percentile(data_flat_use,mm_max_pct)-np.percentile(data_flat_use,mm_min_pct)))
+        # full_prob = (data_flat_use-np.percentile(data_flat_use,mm_min_pct))/((np.percentile(data_flat_use,mm_max_pct)-np.percentile(data_flat_use,mm_min_pct)))
 
-
-        # print(adj_prob.min(),adj_prob.max(),'min, max')
+        # data_ut=[]
+        # for i in range(adj_prob.shape[0]):
+        #     for j in range(i+1,adj_prob.shape[1]):
+        #         data_ut.append(adj_prob[i,j])
+        # data_f2=np.array(data_ut)
+        # print(full_prob.mean(),full_prob.max(),'Strecht mean')
+        # print(full_prob.min(),full_prob.max(),'min, max')
         if mm_clip_data:
+            # full_prob=np.clip(full_prob,mm_clip_range[0],mm_clip_range[1])
             adj_prob=np.clip(adj_prob,mm_clip_range[0],mm_clip_range[1])
-        # plt.hist(adj_prob.flatten(),bins=28)
+
+
+        # plt.hist(full_prob.flatten(),bins=30)
         # plt.show()
+        return adj_prob
+
+    def ms_sigmoid(scan,r,t,identity_treatment='1'):
+        # first find 
+        # data_mean=
+        scan=deepcopy(scan)
+        ## hmmm
+        def sig_func_sim(scan):
+            prob_scan = 1 / (np.exp( -((scan - r) / t))+ 1.0)
+            return prob_scan
+
+        # if percentile_to_set<1:
+        #     percentile_to_set*=100  ## should be full numbers!
+        # if identity_treatment=='1':
+        #     pass
+        # elif identity_treatment=='set_to_pct':
+        #     pass
+        # elif identity_treatment=='set_to_95':
+
+# 
+        # plt.hist(scan.flatten(),bins=20)
+        # plt.show()
+        # print(adj_prob.mean(),'new ean should very')
+
+        full_prob=sig_func_sim(data_flat)
+
+        adj_prob=sig_func_sim(scan)
+
+        if identity_treatment=='1':
+            # aaa
+            for s in range(adj_prob.shape[0]):
+                adj_prob[s,s]=1
+
+        # data_f = []
+        data_ut=[]
+        for i in range(adj_prob.shape[0]):
+            for j in range(i+1,adj_prob.shape[1]):
+                data_ut.append(adj_prob[i,j])
+        data_f2=np.array(data_ut)
+
+        # print(np.max(adj_prob),np.std(adj_prob),'pctinles should be same')
+        # print(data_f2.mean(),'new ean should very')
+        # print(np.max(full_prob),np.std(full_prob),'NO FULL')
+        # print(full_prob.mean(),'FULL PROB')
+
+        # print(np.max(data_f2),np.std(data_f2),'pctinles should be same')
+        # print(data_f2.mean(),'new ean should very')
+
+        # plt.hist(full_prob.flatten(),bins=30)
+        # plt.show()
+        # sksk
         return adj_prob
 
     def ms_norm(scan,mm_clip_data=False,mm_clip_range=(0,1),identity_treatment='Raw',percentile_to_set=95,data_flat=data_flat):
@@ -902,7 +963,7 @@ def create_norm_functions(args):    ##identity options, set to 0, set to 1, set 
     # plt.hist(adj_prob.flatten(),bins=20)
     # plt.title(args.band+" Final distribution, mean:"+str(adj_prob.mean()))
     # plt.show()
-    return {'mm_strech':mm_strech,'ms_norm':ms_norm,'identity':identity,'add_noise':add_noise_func,'pca_transform':pca_transform}
+    return {'mm_strech':mm_strech,'ms_norm':ms_norm,'ms_sigmoid':ms_sigmoid,'identity':identity,'add_noise':add_noise_func,'pca_transform':pca_transform}
 
 
 

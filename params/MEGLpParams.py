@@ -45,8 +45,8 @@ overide_norm=1
 #     print('Cannot skip use norm without set c unless overridden')
 #     print('Use Norm set to 1')
 #     use_norm=1
-use_plv=0
-use_identity=1
+use_plv=1
+use_identity=0
 
 # model='HNN'
 model='HGCN'
@@ -141,6 +141,10 @@ def add_params(parser):
 
     parser.add_argument('--stretch_pct', type=int, default=95)
     parser.add_argument('--stretch_loss', type=int, default=95)
+
+    parser.add_argument('--stretch_sigmoid', type=int, default=1)
+    parser.add_argument('--stretch_t', type=float, default=.03)
+    parser.add_argument('--stretch_r', type=float, default=.34)
 
 
     ##model_config

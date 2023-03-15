@@ -44,11 +44,10 @@ HyperBrain is a inductive learning method that is applicable for any brain imagi
 
 <!-- USAGE EXAMPLES -->
 ## Usage
-
 This section will describe the full pipeline of steps, from data ingestion to model training to embedding analysis.
-
-
+Getting started. Run """conda env create -f environment.yml """
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
+
 
 
 
@@ -63,7 +62,7 @@ This section will describe the full pipeline of steps, from data ingestion to mo
 - [ ] Model Training
     - [x] Training. The code for this is in train_inductive.py. It can be triggered several ways, most simply by calling main.py.
     - [x] Hyperparameter tuning. The code for this is in hyperparams.py, which runs hyperparameter tuning according to hyperparam_config 
-    - [ ] Scripts for training experiments for Link Prediction experiments. The code for this is in study_linkprediction. It utilizes the hyperparameter code. This is not quite complete.
+    - [x] Scripts for training experiments for Link Prediction experiments. The code for this is in study_linkprediction. It utilizes the hyperparameter code. This is not quite complete.
             Additionally, it may take up to a day or more to run all combinations. The code is designed to start from where it left off it processes to not complete.
     - [ ] Baselines
 
@@ -76,6 +75,15 @@ This section will describe the full pipeline of steps, from data ingestion to mo
     - [x] Disease Classificaition. The code for this is available in classification_final.ipynb
 
 
+- [ ] Recreate Plots
+    - [x] Statistical Analysis
+    - [ ] Classification 
+    - [ ] Binary Connectivity Matrix
+    - [ ] Raw Connectivity Matrix
+    - [ ] Diagram of HGCN (Big, pp slide)
+    - [ ] Diagram of HGCN (Condensed, pp slide)
+    - [ ] Aggregation Visualization
+    - [ ] 2D Embedding visualizations
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
