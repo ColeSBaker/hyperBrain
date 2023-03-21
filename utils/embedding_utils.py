@@ -19,7 +19,6 @@ import sys
 import os
 import scipy.stats as st
 
-from numpy_ml.neural_nets.losses import CrossEntropy
 # from statsmodels.stats.weightstats import DescrStats  ## gonna need that for weighted
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.svm import SVC
@@ -1506,9 +1505,14 @@ def multiple_embedding_analysis(emb_roots,clinical_df,label,net_threshold,
         model_path = os.path.join(model_dir,"{}.pt".format('model'))  ### args should be saved with the model
         # printmodel_path,'model path'
         model = th.load(model_path,map_location=torch.device('cpu'))
-        scan_path =  os.path.join(root,'scan_info.csv')
-        scan_info = pd.read_csv(scan_path)
 
+        try:
+            scan_path =  os.path.join(root,'scan_info.csv')
+            scan_info = pd.read_csv(scan_path)
+        except:
+            print('testing changes to scan info with diff names')
+            scan_path =  os.path.join(root,'scan_info_full.csv')
+            scan_info = pd.read_csv(scan_path)
         r=model.dc.r.item()
         t=model.dc.t.item()
         c=model.c.item()

@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from utils.dataloader_utils import load_data_graphalg,load_dataset,load_meg_averages
 from matplotlib import pyplot as plt
+import json
 def save_embeddings_all(trial_dir,first=0,last=-1,save_special=False,overwrite=False):
     ### gotta be automatic nums!
 
@@ -21,7 +22,7 @@ def save_embeddings_all(trial_dir,first=0,last=-1,save_special=False,overwrite=F
 
         
         model_dir = os.path.join(trial_dir,str(f))
-        if not os.path.exists(os.path.join(model_dir,'model.pt')):
+        if not os.path.exists(os.path.join(model_dir,'model.pth')):
             continue
         print(model_dir)
         save_embeddings(model_dir,save_special=save_special,overwrite=overwrite)
@@ -33,7 +34,8 @@ def save_embeddings(model_dir,save_special=False,overwrite=False):
         print('model not finished training, skipping embeddings')
         return
     save_dir = model_dir
-    scan_info_outpath = os.path.join(save_dir,'scan_info.csv')
+    scan_info_outpath = os.path.join(save_dir,'scan_info_full.csv')
+    summary_info_outpath = os.path.join(save_dir,'summary_info.csv')
     embeddings_outdir = os.path.join(save_dir,'embeddings')
 
     if os.path.exists(scan_info_outpath) and os.path.exists(embeddings_outdir) :
@@ -44,7 +46,7 @@ def save_embeddings(model_dir,save_special=False,overwrite=False):
             return
 
     model_name='model'
-    model_path = os.path.join(model_dir,"{}.pt".format(model_name))  ### args should be saved with the model
+    model_path = os.path.join(model_dir,"{}.pth".format(model_name))  ### args should be saved with the model
     model=load_model(model_dir)
 
 
@@ -54,6 +56,7 @@ def save_embeddings(model_dir,save_special=False,overwrite=False):
     # model.get_d
     setattr(model.args,'refresh_data',1)
     evaluate_inductive(model,['train','dev','test'],save_embeddings=True,save_dir=save_dir)
+    create_res_df_model(model_dir,summary_outpath=summary_info_outpath)
     
 def save_embeddings_alternative(model_dir,config_override:dict):
     model=load_model(model_dir)
@@ -104,99 +107,241 @@ def load_model(model_dir,config_override={}):
                 setattr(args,k,v)
         print(args,'ARGUING')
         args.feat_dim = args.num_feature
-        # args.r
+        # args.rget_embedding_correlation
         model = Model(args).to(args.device)
 
     return model
 
+# def create_embeddings(model,data_loader_dicts,scan_info_outpath,embeddings_outdir):
+#     if os.path.exists(embeddings_outdir):
+
+#         os.makedirs(embeddings_outdir,exist_ok=True)
+
+#     node_id_col='RoiID'
+#     dim_order = ['x','y','z','a','b','c','d','e','f','g','h','i','j','k','l','m','n','o']
+#     dim_cols =dim_order[:model.args.output_dim]
+#     embedding_cols= [node_id_col]+dim_cols ### do we need anything else?
+
+#     scan_info_df=pd.DataFrame(columns=['graph_id','train','test','val','label','save_location'])
+#     all_embeddings=[]
+#     scan_data=[]
+#     seen_nodes=set([])
+#     # need embedding columns
+#     with torch.no_grad():
+#         model.eval()
+#         embeddings_df= pd.DataFrame(columns=embedding_cols) ##['x']
+#         # model.reset_epoch_stats(1000, split)
+#         first=True
+#         running_mAP=0
+#         running_mean_rank=0
+#         count=0
+
+#         for split,data_loader in data_loader_dicts:
+#             # data_loader= split_to_loader[split]
+#             model.reset_epoch_stats(1000, 'start')
+#             for i, data in enumerate(data_loader):
+#                 for x, val in data.items():
+#                     if torch.is_tensor(data[x]):
+#                         data[x] = data[x].to(model.args.device)
+
+#                 data['features']  = data['features'][0]
+#                 print(data['features'].shape,'SHAPE!!')
+#                 data['edges']  = data['edges'][0]
+#                 data['edges_false']  = data['edges_false'][0]
+#                 data['adj_mat']  =  data['adj_mat'].to_dense()[0].to_sparse()
+#                 use_node_list = 'node_to_indx' in data.keys()
+
+#                 if model.args.double_precision>0:
+#                     data['features']=data['features'].double()
+#                 else:
+#                     print(model.args.double_precision,'PREC AGAIN')
+#                 embeddings = model.encode(data['features'], data['adj_mat'] ) #### to add into data-> data['nodeIDs']. may seem like overkill but I won't let us get fucked up again
+#                 pos_scores = model.decode(embeddings, data['edges'])
+#                 neg_scores = model.decode(embeddings, data['edges_false'])
+
+#                 node_num=data['labels'].shape[1]
+#                 if not use_node_list:
+#                     embeddings_df[dim_cols]=embeddings[:node_num,:].detach().numpy()
+#                     embeddings_df[node_id_col]= [str(i)+"_r" for i in range(node_num)]
+#                 else:
+#                     nodes=[]
+#                     indxs = []
+#                     for n,indy in data['node_to_indx'].items():
+#                         nodes.append(n)
+#                         indxs.append(indy.item())
+#                     embeddings_df[dim_cols]=embeddings[indxs,:].detach().numpy()
+#                     embeddings_df[node_id_col]= nodes
+
+#                 graph_id = data['graph_id'][0]
+#                 if graph_id not in seen_nodes:
+#                     seen_nodes.add(graph_id)
+#                 else:
+#                     continue
+#                 output_file= str(graph_id)+"_embeddings.csv"
+#                 output_path = os.path.join(embeddings_outdir,output_file)
+#                 # add all here or something?
+#                 train=1 if split=='train' else 0
+#                 test=1 if split=='test' else 0
+#                 val=1 if split=='val' else 0
+#                 label=data['labels'][0][0].item()
+#                 save_path=output_path
+            
+#                 scan_info_row = [graph_id,train,test,val,label,save_path]
+#                 scan_data.append(scan_info_row)
+
+
+#                 if embeddings_outdir=='':
+#                     raise Exception("CANNOT SAVE TO NO PATH")
+#                 print(output_path,'SAVE EMBEDDINGS!')
+
+#                 embeddings_df.to_csv(output_path,index=False)
+#                 all_embeddings.append(embeddings_df)
+
+#     scan_info_df= pd.DataFrame(data=scan_data ,columns=['graph_id','train','test','val','label','save_location'])
+#     scan_info_df=scan_info_df.set_index('graph_id',drop=False)
+#     print(scan_info_outpath)
+#     scan_info_df.to_csv(scan_info_outpath)
+#     return scan_info_df, all_embeddings
+
 def create_embeddings(model,data_loader_dicts,scan_info_outpath,embeddings_outdir):
+    # we are going to adjust this in two major ways
+    # 1. by adding the scoring df
+    # 2. by removing the train/test/val loader
+        # it is a problem because train/test/val can change based over time
+    # we need ONE loader where train/test/val is added on later based on jsons
+    # test should refer to any item not in train or val.
     if os.path.exists(embeddings_outdir):
 
         os.makedirs(embeddings_outdir,exist_ok=True)
+
+
 
     node_id_col='RoiID'
     dim_order = ['x','y','z','a','b','c','d','e','f','g','h','i','j','k','l','m','n','o']
     dim_cols =dim_order[:model.args.output_dim]
     embedding_cols= [node_id_col]+dim_cols ### do we need anything else?
 
-    scan_info_df=pd.DataFrame(columns=['graph_id','train','test','val','label','save_location'])
+    with open(os.path.join(model.args.save_dir,'config.json')) as f:
+        config=json.load(f)
+
+    if config['train_only']:
+        train_only=True
+    else:
+        train_only=False
+        idx_set=config['idxs_dict']
+        # for group,members in config['idxs_dict'].items():
+        #     member_set=set(members)
+        #     emb_stat_df_sub=emb_stat_df[emb_stat_df['Scan Index'].isin(member_set)]
+        #     title='{} Embeddings'.format(group)
+        #     print(group)
+        #     print(len(member_set),emb_stat_df_sub.shape,'member shapes')
+
+    output_cols=['graph_id','train','test','val','label','save_location','MAP','Rank','MeanDegree','Spearman','Pearson']
+    # output_cols=['graph_id','train','test','val','label','save_location','MAP','Rank','MeanDegree']
+    # scan_info_df=pd.DataFrame(columns=['graph_id','train','test','val','label','save_location','MAP','Rank'])
     all_embeddings=[]
     scan_data=[]
     seen_nodes=set([])
     # need embedding columns
-    with torch.no_grad():
-        model.eval()
-        embeddings_df= pd.DataFrame(columns=embedding_cols) ##['x']
-        # model.reset_epoch_stats(1000, split)
-        first=True
-        running_mAP=0
-        running_mean_rank=0
-        count=0
 
-        for split,data_loader in data_loader_dicts:
-            # data_loader= split_to_loader[split]
-            model.reset_epoch_stats(1000, 'start')
-            for i, data in enumerate(data_loader):
-                for x, val in data.items():
-                    if torch.is_tensor(data[x]):
-                        data[x] = data[x].to(model.args.device)
-                data['features']  = data['features'][0]
-                print(data['features'].shape,'SHAPE!!')
-                data['edges']  = data['edges'][0]
-                data['edges_false']  = data['edges_false'][0]
-                data['adj_mat']  =  data['adj_mat'].to_dense()[0].to_sparse()
-                use_node_list = 'node_to_indx' in data.keys()
+    model.eval()
+    embeddings_df= pd.DataFrame(columns=embedding_cols) ##['x']
+    # model.reset_epoch_stats(1000, split)
+    first=True
+    count=0
 
-                if model.args.double_precision>0:
-                    data['features']=data['features'].double()
-                else:
-                    print(model.args.double_precision,'PREC AGAIN')
-                embeddings = model.encode(data['features'], data['adj_mat'] ) #### to add into data-> data['nodeIDs']. may seem like overkill but I won't let us get fucked up again
-                pos_scores = model.decode(embeddings, data['edges'])
-                neg_scores = model.decode(embeddings, data['edges_false'])
+    # data_loader= split_to_loader[split]
+    for split,data_loader in data_loader_dicts:
+        # data_loader= split_to_loader[split]
+        model.reset_epoch_stats(1000, 'start')
+        for i, data in enumerate(data_loader):
+            for x, val in data.items():
+                if torch.is_tensor(data[x]):
+                    data[x] = data[x].to(model.args.device)
+            graph_id = data['graph_id'][0]
+            # if len(scan_data)>2:
+                # break
+            if graph_id not in seen_nodes:
+                seen_nodes.add(graph_id)
+            else:
+                continue
 
-                node_num=data['labels'].shape[1]
-                if not use_node_list:
-                    embeddings_df[dim_cols]=embeddings[:node_num,:].detach().numpy()
-                    embeddings_df[node_id_col]= [str(i)+"_r" for i in range(node_num)]
-                else:
-                    nodes=[]
-                    indxs = []
-                    for n,indy in data['node_to_indx'].items():
-                        nodes.append(n)
-                        indxs.append(indy.item())
-                    embeddings_df[dim_cols]=embeddings[indxs,:].detach().numpy()
-                    embeddings_df[node_id_col]= nodes
+            data['features']  = data['features'][0]
+            print(data['features'].shape,'SHAPE!!')
+            data['edges']  = data['edges'][0]
+            data['edges_false']  = data['edges_false'][0]
+            data['adj_mat']  =  data['adj_mat'].to_dense()[0].to_sparse()
+            use_node_list = 'node_to_indx' in data.keys()
 
-                graph_id = data['graph_id'][0]
-                if graph_id not in seen_nodes:
-                    seen_nodes.add(graph_id)
-                else:
-                    continue
-                output_file= str(graph_id)+"_embeddings.csv"
-                output_path = os.path.join(embeddings_outdir,output_file)
-                # add all here or something?
-                train=1 if split=='train' else 0
-                test=1 if split=='test' else 0
-                val=1 if split=='val' else 0
-                label=data['labels'][0][0].item()
-                save_path=output_path
-            
-                scan_info_row = [graph_id,train,test,val,label,save_path]
-                scan_data.append(scan_info_row)
+            if model.args.double_precision>0:
+                data['features']=data['features'].double()
+            else:
+                print(model.args.double_precision,'PREC AGAIN')
+            embeddings = model.encode(data['features'], data['adj_mat'] ) #### to add into data-> data['nodeIDs']. may seem like overkill but I won't let us get fucked up again
+            pos_scores = model.decode(embeddings, data['edges'])
+            neg_scores = model.decode(embeddings, data['edges_false'])
+            mean_rank,mAP,mean_degree=model.get_embedding_score(embeddings.detach().numpy(),data['edges'].detach().numpy())
+            spearman,pearson= model.get_embedding_correlation(embeddings.detach().numpy(),data['adj_original'].detach().numpy())
+            node_num=data['labels'].shape[1]
+            if not use_node_list:
+                embeddings_df[dim_cols]=embeddings[:node_num,:].detach().numpy()
+                embeddings_df[node_id_col]= [str(i)+"_r" for i in range(node_num)]
+            else:
+                nodes=[]
+                indxs = []
+                for n,indy in data['node_to_indx'].items():
+                    nodes.append(n)
+                    indxs.append(indy.item())
+                embeddings_df[dim_cols]=embeddings[indxs,:].detach().numpy()
+                embeddings_df[node_id_col]= nodes
 
-                if embeddings_outdir=='':
-                    raise Exception("CANNOT SAVE TO NO PATH")
-                print(output_path,'SAVE EMBEDDINGS!')
 
-                embeddings_df.to_csv(output_path,index=False)
-                all_embeddings.append(embeddings_df)
+            output_file= str(graph_id)+"_embeddings.csv"
+            output_path = os.path.join(embeddings_outdir,output_file)
+            # add all here or something?
+            train= 0
+            test= 0
+            val=0
+            graph_id=int(graph_id)
 
-    scan_info_df= pd.DataFrame(data=scan_data ,columns=['graph_id','train','test','val','label','save_location'])
+
+            if train_only or (graph_id in idx_set['train']):
+                train=1
+            elif graph_id in idx_set['valid']:
+                val=1
+            elif graph_id in idx_set['test']:
+                test=1
+            else:
+                print(graph_id)
+                print(type(idx_set['valid'][0]))
+                print(type(idx_set['valid'][0]))
+                print(type(idx_set['test'][0]))
+                print(idx_set['train'])
+                print(idx_set['valid'])
+                print(idx_set['test'])
+                raise Exception('This may not be an issue, maybe we want to allow for unseen nodes?') 
+
+            label=data['labels'][0][0].item()
+            save_path=output_path
+        
+            scan_info_row = [graph_id,train,test,val,label,save_path,mAP,mean_rank,mean_degree,spearman,pearson]
+            scan_data.append(scan_info_row)
+
+            if embeddings_outdir=='':
+                raise Exception("CANNOT SAVE TO NO PATH")
+            print(output_path,'SAVE EMBEDDINGS!')
+
+            embeddings_df.to_csv(output_path,index=False)
+            all_embeddings.append(embeddings_df)
+
+    scan_info_df= pd.DataFrame(data=scan_data ,columns=output_cols)
     scan_info_df=scan_info_df.set_index('graph_id',drop=False)
     print(scan_info_outpath)
     scan_info_df.to_csv(scan_info_outpath)
+
     return scan_info_df, all_embeddings
+
+
 def evaluate_inductive(model,splits=['train','test','dev'],save_embeddings=True,save_dir=''):
 	"""
 	why cant this happen automatically after training?
@@ -218,7 +363,7 @@ def evaluate_inductive(model,splits=['train','test','dev'],save_embeddings=True,
 	model.eval()
 
 	# scan_info_df=pd.DataFrame(columns=['graph_id','train','test','val','label','save_location']) ### graph ids, train/test/val, label, SAVE LOCATION
-	scan_info_outpath = os.path.join(save_dir,'scan_info.csv')
+	scan_info_outpath = os.path.join(save_dir,'scan_info_full.csv')
 	embeddings_outdir = os.path.join(save_dir,'embeddings')
 
 	if save_embeddings and (embeddings_outdir==''):
@@ -229,9 +374,62 @@ def evaluate_inductive(model,splits=['train','test','dev'],save_embeddings=True,
 	create_embeddings(model,data_loaders,scan_info_outpath,embeddings_outdir)
 
 
+def summarize_scan_embs(scan_df,stat_cols=['MAP','Rank','MeanDegree','Spearman','Pearson'],splits=['train','test','val']):
+    """
+    3 years, one for each split
+    this will pass along nicely.
+    these really are seperate stats!
+    """
+    output_cols=['split','num_scans','pct_scans']+stat_cols
+    sumdf_list=[]
+    for s in splits:
+        print(s)
+        subscans=scan_df[scan_df[s]==1]
+        print(subscans,'SUB SHAPE')
+        print(subscans.shape,'SUB SHAPE')
+        summarize_df_sub=subscans[stat_cols].mean().to_frame().transpose()
+        print(summarize_df_sub)
+        summarize_df_sub['split']=s
+        summarize_df_sub['num_scans']=subscans.shape[0]
+        sumdf_list.append(summarize_df_sub)
+    print(sumdf_list,'list em')
+    summarize_df=pd.concat(sumdf_list,axis=0)
+    print(summarize_df['num_scans'].sum())
+    summarize_df['pct_scans']=summarize_df['num_scans']/summarize_df['num_scans'].sum()
 
+    print(summarize_df,'SUMMARIZE')
+    return summarize_df
+
+def create_res_df_model(model_dir,summary_outpath=''):
+    """
+    takes in a model directory, with attached embeddings, and returns a one row
+    dataframe that includes losses, c roc, epoch data from model and MAP, RANK etc. from embeddings.
+    """
+    # must check for scan!!
+    scan_df=pd.read_csv(os.path.join(model_dir,'scan_info_full.csv'))
+    summ_df=summarize_scan_embs(scan_df,stat_cols=['MAP','Rank','MeanDegree','Spearman','Pearson'],splits=['train','test','val'])
+    model_path=os.path.join(model_dir)
+    model = load_model(model_path)
+
+    summ_df['roc']=summ_df.apply(lambda split_row: best_loss(model,stat_to_plot='roc',split=split_row['split'])[0],axis=1)
+    summ_df['roc_epoch']=summ_df.apply(lambda split_row: best_loss(model,stat_to_plot='roc',split=split_row['split'])[1],axis=1)
+    summ_df['loss']=summ_df.apply(lambda split_row: best_loss(model,stat_to_plot='loss',split=split_row['split'])[0],axis=1)
+    summ_df['loss_epoch']=summ_df.apply(lambda split_row: best_loss(model,stat_to_plot='loss',split=split_row['split'])[1],axis=1)
+
+    summ_df['c']=model.c.item()
+    print(summ_df)
+    # data_dict['best_epoch'].append('')
+    if summary_outpath:
+        summ_df.to_csv(summary_outpath)
+    return summ_df
+
+ 
 def create_res_df_study(study_dir,save_df=True,train_only=True):
 ### loss, roc, epoch #, gamma, final lr, 
+    """
+    this is a great functino
+    we need to combine it with the new stats in stat_Df.
+    """
     columns=['dir','loss','roc','gamma','c','lr-reduce-freq','lr','best_epoch']
     data_dict={c:[] for c in columns}
     # model_list=[os.path.join(study_dir,m) for m in os.listdir(study_dir) if ('.pt' not in m) and ('.csv' not in m)]
@@ -281,6 +479,28 @@ def plot_loss_dir(model_list,stat_to_plot='roc',train_only=False):
 
 
 
+def best_loss(model,split,stat_to_plot='roc'):
+    trans={'val':'dev'}
+    if stat_to_plot in ('roc'):
+        optimize = 'max'
+    else:
+        optimize = 'min'
+
+    split_str=trans[split] if split in trans else split
+    loss_type = 'MSE' if model.args.use_weighted_loss else 'BCE'
+    str_stat = stat_to_plot if stat_to_plot!= 'loss' else loss_type
+    stats=model.metrics_tracker
+    losses=[t[stat_to_plot] for t in stats[split_str]]
+
+    print('split')
+    print(stat_to_plot)
+    print(losses,'losses')
+
+    best_epoch = np.argmin(losses) if optimize=='min' else np.argmax(losses)
+    best_loss = losses[best_epoch]
+    str_train=str(best_loss)[:5]
+
+    return best_loss,best_epoch
 def plot_loss(model,stat_to_plot='roc',show=True,train_only=False):
     ### consider setting train back one.
     """

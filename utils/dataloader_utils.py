@@ -123,9 +123,9 @@ def load_dataset(args,dataset_name):
 
     if hasattr(args,'refresh_data') and args.refresh_data>0:
         train_file,dev_file,test_file,all_file,idxs_dict,indx_file = preprocess_func(args)
-        args.train_file=train_file
-        args.dev_file=dev_file
-        args.test_file=test_file
+        # args.train_file=train_file
+        # args.dev_file=dev_file
+        # args.test_file=test_file
         args.all_file=all_file
         # we should get rid of all of the file references... no need to every look back at something 
         # that gets overwritten

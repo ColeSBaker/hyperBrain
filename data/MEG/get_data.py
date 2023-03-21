@@ -148,8 +148,8 @@ def preprocess(args):
         # save the dataset
         # print(processed_data[section].keys())
         save_file = os.path.join(root,'meg_%s_%s_%s.json' % (section, dataset_str,args.adj_threshold))
-        with open(save_file, 'w') as f:
-            json.dump(processed_data[section], f)
+        # with open(save_file, 'w') as f:
+            # json.dump(processed_data[section], f)
         if section=='train':
             train_file=save_file
         if section=='test':
@@ -175,14 +175,15 @@ def preprocess(args):
     print(len(all_idtest),'unique ids')
     print(file_count,'Final count')
     # pri
-    return train_file,valid_file,test_file,all_file,idxs_dict,indx_file
+    # cant we get rid of these files??
+    return None,None,None,all_file,idxs_dict,indx_file
 
 def graph_data_dict_recursive(args,scan,clinical,label_names,atlas,norm_functions={},noise_num=0,noise_level=0,is_root=True):
     # print(scam)
     if is_root: ### base graph, means we 
-        edges,feats,labels,adj_prob,_  = to_graph(args,scan,clinical,label_names,atlas=atlas,norm_functions=norm_functions)
+        edges,feats,labels,adj_prob,_,adj_true  = to_graph(args,scan,clinical,label_names,atlas=atlas,norm_functions=norm_functions)
     else:
-        edges,feats,labels,adj_prob,_  = to_graph(args,scan,clinical,label_names,atlas=atlas,norm_functions=norm_functions,add_noise=noise_level)
+        edges,feats,labels,adj_prob,_,adj_true  = to_graph(args,scan,clinical,label_names,atlas=atlas,norm_functions=norm_functions,add_noise=noise_level)
 
     if len(edges) <= 0:
         print('NO EDGES???')
@@ -193,6 +194,7 @@ def graph_data_dict_recursive(args,scan,clinical,label_names,atlas,norm_function
             'node_features': feats.tolist(),# from graph
             'graph_id': str(clinical['Scan Index']), # from graph
             'adj_prob': adj_prob.tolist(), # from graph
+            'adj_original':adj_true.tolist(),
             'noise_data':[]} # from graph make
     if noise_level<=0 or (noise_num==0) or (not is_root):  ### could do not "is root" bc we should do more than one layer..
     # if noise_level<=0 or (noise_num==0) or (not is_root):  ### could do not "is root" bc we should do more than one layer..
@@ -279,20 +281,24 @@ def to_graph(args,scan,clinical,label_names,atlas,norm_functions={},return_label
             adj_flat.append(single_scan[j, k])
     # print(norm_functions.keys(),'final')
     # print(norm_functions['mm_strech'])
+
+
     if hasattr(args,'stretch_sigmoid') and args.stretch_sigmoid:
         # adj_prob=norm_functions['ms_sigmoid'](single_scan,.36,.04,identity_treatment='1')
-
         adj_prob=norm_functions['ms_sigmoid'](single_scan,args.stretch_r,args.stretch_t,identity_treatment='1')
-        # adj_prob=norm_functions['mm_strech'](single_scan,mm_min_pct=100-args.stretch_loss,mm_max_pct=args.stretch_loss,mm_clip_data=True,identity_treatment='Raw') ##
-        # aakkakat
-    # adj_prob_transform='0_1_95th'
-    # if adj_prob_transform  in ('None',None) or norm_functions=={}:
-    #     # raise Exception('CANNOT LEAVE PROB METRIX UNATTENDED LIKE THAT')
-    #     print('CANNOT LEAVE PROB METRIX UNATTENDED LIKE THAT')
-    #     adj_prob=single_scan
+        plv_loss_func='sig'
+
     else:
-        # adj_prob=norm_functions['ms_sigmoid'](single_scan,.35,.04,identity_treatment='1')
-        adj_prob=norm_functions['mm_strech'](single_scan,mm_min_pct=100-args.stretch_loss,mm_max_pct=args.stretch_loss,mm_clip_data=True,identity_treatment='Raw') ## seems like set to max is already covered
+        if hasattr(args,'stretch_loss') and args.stretch_loss:
+            # print('STRECH LOS')
+            stretch_loss=args.stretch_loss
+        else:
+            args.stretch_loss=95
+            stretch_loss=95
+        plv_loss_func='stretch'
+        # # adj_prob=norm_functions['ms_sigmoid'](single_scan,.35,.04,identity_treatment='1')
+        adj_prob=norm_functions['mm_strech'](single_scan,mm_min_pct=100-stretch_loss,mm_max_pct=stretch_loss,mm_clip_data=True,identity_treatment='Raw') ## seems like set to max is already cov
+        # adj_prob=norm_functions['mm_strech'](single_scan,mm_min_pct=100-stretch_loss,mm_max_pct=stretch_loss,mm_clip_data=True,identity_treatment='set_to_max') ## seems like set to max is already covered
 
     # print(add_noise,'how much noise?')
     # print(adj_prob[0],'prob 1')
@@ -339,16 +345,49 @@ def to_graph(args,scan,clinical,label_names,atlas,norm_functions={},return_label
         metric_feat = METRIC_TO_INDEX['plv']
         # feats =deepcopy(scan[band_feat,metric_feat])  ### need to do feats here?
         feats=single_scan ## needs to be the same if adding noise?s
+
         if hasattr(args,'plv_pca_dim') and args.plv_pca_dim>0:
             feats=norm_functions['pca_transform'](single_scan)
+
+        elif hasattr(args,'match_plv_inp_loss') and args.match_plv_inp_loss:
+            # plt.hist(feats.flatten(),bins=30)
+            # plt.show()
+            if plv_loss_func=='sig':
+                feats=norm_functions['ms_sigmoid'](feats,args.stretch_r,args.stretch_t,identity_treatment='1')
+
+            elif plv_loss_func=='stretch':
+                # same as in input func except id_treatment (which is irrelevant for loss func, because we ignore self-loss.)
+                feats=norm_functions['mm_strech'](feats,mm_min_pct=5,mm_max_pct=100,mm_clip_data=False,identity_treatment='set_to_max') ## seems like set to max is already covered
+
+            else:
+                raise Exception('cannot mimic {}'.format(plv_loss_func))
+
+            plt.hist(single_scan.flatten(),bins=50)
+            plt.hist(feats.flatten(),bins=50)
+            # plt.hist(oldway.flatten(),bins=30)
+            plt.show()
+        elif hasattr(args,'plv_inp_raw') and args.plv_inp_raw:
+            feats=norm_functions['identity'](feats,identity_treatment='1')
+            # plt.hist(single_scan.flatten(),bins=50)
+            # plt.show()
+            # plt.hist(feats.flatten(),bins=50)
+            # # plt.hist(oldway.flatten(),bins=30)
+            # plt.show()
+
         else:
-            max_scan=np.max(adj_flat)
             if hasattr(args,'stretch_pct'):
                 stretch_pct=args.stretch_pct
             else:
                 stretch_pct=95
+            if hasattr(args,'plv_norm_w_id'):
+                include_id_std=args.plv_norm_w_id
+            else:
+                include_id_std=False
 
-            feats=norm_functions['ms_norm'](feats,mm_clip_data=False,identity_treatment='set_to_pct',percentile_to_set=stretch_pct)
+            feats=norm_functions['ms_norm'](feats,mm_clip_data=False,identity_treatment='set_to_pct',percentile_to_set=stretch_pct,include_id_std=include_id_std)
+            # plt.hist(feats.flatten(),bins=50)
+            # plt.hist(single_scan.flatten(),bins=50)
+            # plt.show()
         feats=feats.astype(float)
         feat_list.append(feats)
         print(feats.std(),'new standard')
@@ -443,7 +482,7 @@ def to_graph(args,scan,clinical,label_names,atlas,norm_functions={},return_label
     # print(feats,'FEATS')
     print(feats.shape,'FEATS SHOULD BE HIGH')
     # sss
-    return [e for e in G.edges(data=True)], feats,labels.astype(float)-1,adj_prob,adj_noise
+    return [e for e in G.edges(data=True)], feats,labels.astype(float)-1,adj_prob,adj_noise,single_scan
     # return get_edges(G),feats.astype(float),labels.astype(float)
 
 def get_average_data(args,subject_cols):
@@ -701,7 +740,8 @@ def dataset_split(download_clinical,download_MEG,val_pct=.2,test_pct=.1,val_subg
     file_count=0
     raw_data = {'train': [], 'valid': [], 'test': [],'all':[]} # save the train, valid dataset.
 
-    train_idx=list(train_idx)+list(test_idx)
+    # train_idx=list(train_idx)+list(test_idx)
+    train_idx=list(train_idx)
     idxs_dict = {'train': train_idx, 'valid': valid_idx, 'test': test_idx,'all':all_scanids}
     # for i, data_item in enumerate(all_data):
     print(len(train_idx),len(valid_idx),len(test_idx),'lengths after add test to train')
@@ -782,12 +822,25 @@ def create_norm_functions(args):    ##identity options, set to 0, set to 1, set 
     for i in range(right_data.shape[1]):
         for j in range(i+1,right_data.shape[2]):
             data_ut.append(right_data[:,i,j])
+    data_full=deepcopy(right_data)
+    for s in range(data_full.shape[1]):
+        data_full[:,s,s]=1
     data_flat=np.array(data_ut).flatten()
+
+
+    data_flat_std=data_flat.std()
+    data_flat_mean=data_flat.mean()
+    data_full_std=data_full.std()
+    data_full_mean=data_full.mean()
+
 
     if hasattr(args,'plv_pca_dim') and args.plv_pca_dim>0:
         fitted_pca,pca_max,pca_std = make_fitted_pca(right_data,args.plv_pca_dim)
     else:
         fitted_pca=None
+
+    percentile_cache={'flat':{95:np.percentile(data_flat,95)}
+                    ,'full':{95:np.percentile(data_full,95)}}
     # print(np.percentile(data_flat,75),80)
     # print(np.percentile(data_flat,80),80)
     # print(np.percentile(data_flat,85),85)
@@ -807,6 +860,7 @@ def create_norm_functions(args):    ##identity options, set to 0, set to 1, set 
     print(np.percentile(data_flat,85),'85')
     print(np.percentile(data_flat,90),'90')
     print(np.percentile(data_flat,95),'95')
+    # pctile_cache
     # data_flat_show=np.clip(data_flat,.2,.65)
     # plt.hist(data_flat_show,bins=30)
 
@@ -844,20 +898,32 @@ def create_norm_functions(args):    ##identity options, set to 0, set to 1, set 
         adj_prob = (scan_use-np.percentile(data_flat_use,mm_min_pct))/((np.percentile(data_flat_use,mm_max_pct)-np.percentile(data_flat_use,mm_min_pct)))
         # full_prob = (data_flat_use-np.percentile(data_flat_use,mm_min_pct))/((np.percentile(data_flat_use,mm_max_pct)-np.percentile(data_flat_use,mm_min_pct)))
 
-        # data_ut=[]
-        # for i in range(adj_prob.shape[0]):
-        #     for j in range(i+1,adj_prob.shape[1]):
-        #         data_ut.append(adj_prob[i,j])
-        # data_f2=np.array(data_ut)
+
         # print(full_prob.mean(),full_prob.max(),'Strecht mean')
         # print(full_prob.min(),full_prob.max(),'min, max')
         if mm_clip_data:
             # full_prob=np.clip(full_prob,mm_clip_range[0],mm_clip_range[1])
             adj_prob=np.clip(adj_prob,mm_clip_range[0],mm_clip_range[1])
 
+        data_ut=[]
+        # print()
+        for i in range(adj_prob.shape[0]):
+            for j in range(i+1,adj_prob.shape[1]):
+                # print(i,j,'PROBS')
+                if i==j:
+                    print(adj_prob[i,j],'ID')
+                data_ut.append(adj_prob[i,j])
 
-        # plt.hist(full_prob.flatten(),bins=30)
+        data_ut=np.array(data_ut)
+        # if 
+        # print(adj_prob.shape,'ADJ PROB SHAPE?')
+        # print(data_ut.mean(),'cleaned mean')
+        # plt.hist(data_ut.flatten(),bins=50)
         # plt.show()
+        # print(adj_prob.mean(),'ID mean')
+        # plt.hist(adj_prob.flatten(),bins=50)
+        # plt.show()
+        # # akaka
         return adj_prob
 
     def ms_sigmoid(scan,r,t,identity_treatment='1'):
@@ -911,10 +977,11 @@ def create_norm_functions(args):    ##identity options, set to 0, set to 1, set 
         # sksk
         return adj_prob
 
-    def ms_norm(scan,mm_clip_data=False,mm_clip_range=(0,1),identity_treatment='Raw',percentile_to_set=95,data_flat=data_flat):
+    def ms_norm(scan,mm_clip_data=False,mm_clip_range=(0,1),identity_treatment='Raw',percentile_to_set=95,data_flat=data_flat,include_id_std=False):
 
         data_flat=data_flat
         # data_mean=
+        scan_og=scan
         scan=deepcopy(scan)
         if percentile_to_set<1:
             percentile_to_set*=100  ## should be full numbers!
@@ -923,24 +990,53 @@ def create_norm_functions(args):    ##identity options, set to 0, set to 1, set 
         elif identity_treatment=='set_to_pct':
             
             for s in range(scan.shape[0]):
-                scan[s,s]=np.percentile(data_flat,percentile_to_set)
+                # percentile calculations take fooooorever
+                if percentile_to_set in percentile_cache['flat']:
+                    pct_flat=percentile_cache['flat'][percentile_to_set]
+                else:
+                    pct_flat=np.percentile(data_flat,percentile_to_set) 
+                    percentile_cache['flat'][percentile_to_set]=pct_flat
+
+                if percentile_to_set in percentile_cache['full']:
+                    pct_full=percentile_cache['full'][percentile_to_set]
+                else:
+                    pct_full=np.percentile(data_full,percentile_to_set) 
+                    percentile_cache['full'][percentile_to_set]=pct_full
+                # print(pct_flat,'pct_flat')
+                # print(pct_full,'pct_full')
+                scan[s,s]=pct_flat
+                scan_og[s,s]=pct_full
+                # scan[s,s]=1
+                # scan_og[s,s]=1
+        #     scan[s,s]=np.percentile(data_flat,percentile_to_set)
         # elif identity_treatment=='set_to_95':
         #     for s in range(scan.shape[0]):
         #         scan[s,s]=np.percentile(data_flat,95)
 
         # plt.hist(scan.flatten(),bins=20)
         # plt.show()
-        adj_prob=(scan-np.mean(data_flat))/(np.std(data_flat))
-        if mm_clip_data:
-            adj_prob=np.clip(adj_prob,mm_clip_range[0],mm_clip_range[1])
-        # print(np.max(adj_prob),np.std(adj_prob),'pctinles should be same')
-        # print(adj_prob.mean(),'new ean should very')
-
-        # plt.hist(adj_prob.flatten(),bins=20)
+        if include_id_std:
+            adj_prob=(scan_og-data_full_mean)/(data_full_std)
+        else:
+            adj_prob=(scan-data_flat_mean)/(data_flat_std)
+        # adj_prob_old=(scan-data_flat_mean)/(data_flat_std)
+        # print('new')
+        # plt.hist(adj_prob.flatten(),bins=40)
+        # plt.show()
+        # print('other')
+        # plt.hist(adj_prob_old.flatten(),bins=40)
         # plt.show()
         return adj_prob
 
-    def identity(scan):
+
+
+    def identity(scan,identity_treatment='raw'):
+        scan=deepcopy(scan)
+        if identity_treatment=='1':
+            # print('identity_treatment')
+            for s in range(scan.shape[0]):
+                scan[s,s]=1
+
         return scan
 
     def pca_transform(scan):
