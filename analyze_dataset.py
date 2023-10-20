@@ -69,16 +69,10 @@ if __name__ == '__main__':
                 
 
         X_weight = np.array([a[np.triu_indices(a.shape[0],k=1)] for a in train_scans])
-        # plt.hist(X_weight.flatten(),bins=20)
-        # plt.show()
         threshold=[np.percentile(X_weight,p) for p in percentiles]
-        # print(threshold,'THRESHOLS')
-        # adda
-
-
         # dffff
     else:
-        raise Exception('fuck this ya')
+        raise Exception('insisting on using percentile')
     # threshold = [.33,.35]
     # threshold = [.17,.18,.19,.2,.21,.22,.23,.24,.25,.26,.28,.29,.3,.31,.32,.33,.35,.36,.37,.38,.39,.4]
 
@@ -101,9 +95,6 @@ if __name__ == '__main__':
     for t in threshold:
         t=t
         setattr(args,'adj_threshold',t)
-
-        # print(args.adj_threshold,'ARGMUIIIE')
-        # continue
         train_file,valid_file,test_file,all_file,idxs_dict,indx_file = preprocess(args)
         # d
         # d
@@ -118,18 +109,7 @@ if __name__ == '__main__':
             for g in groups: 
                 for s in stats:
                     stat_results[s][g].append(results[g][s])
-            # print('out')
-            # print(results)
-            # hyps.append(res)
-    #         props.append(props)
-    #         # print(res,'res')
-            # samps[(t,n)]=res
-            # results
 
-
-    # print(threshold)
-    # print(hyps)
-    # print(props)
     x_label=percentiles if plot_percentiles else False
     colors = ['red','blue','green','yellow']
     
@@ -174,10 +154,6 @@ if __name__ == '__main__':
         col=a%num_cols
         row= a //num_cols
         ax = axes[row,col] 
-        # print(ax)
-        # print(axes)
-        # ax.
-    
         ax.title.set_text(title)
         if row!=(num_rows-1):
             ax.xaxis.set_visible(False)

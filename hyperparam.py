@@ -136,6 +136,7 @@ def create_study_output_dir(args):
         subset_str='pats'
         for criteria,v in args.criteria_dict.items():
             subset_str+='_{}{}'.format(criteria,v)
+
     batch_str=args.batch_size if args.use_batch else 1
 
     val_pct_st=args.val_prop if not args.train_only else 0
@@ -144,11 +145,42 @@ def create_study_output_dir(args):
 
     str_loss_str='strchloss{}'.format(args.stretch_loss) if not args.stretch_sigmoid else 'sigloss_{}_{}'.format(args.stretch_r,args.stretch_t)
     stretch_str='strchinp{}_strchloss{}'.format(args.stretch_pct,args.stretch_loss) 
-    hpt_dir='e{}_p{}_lr{}_{}_strchinp{}_{}_b{}'.format(args.epochs,args.patience,args.lr,val_str,args.stretch_pct,str_loss_str,args.batch_size)
+
+    if hasattr(args,'use_weighted_bce') and args.use_weighted_bce:
+        loss_type_str='cce'
+    else:
+        loss_type_str='mse'
+
+    if hasattr(args,'match_plv_inp_loss') and args.match_plv_inp_loss:
+        input_stretch_str='match'
+    elif hasattr(args,'plv_inp_raw') and args.plv_inp_raw: 
+        input_stretch_str='raw'
+    elif hasattr(args,'plv_norm_w_id') and args.plv_norm_w_id: 
+        input_stretch_str=str(args.stretch_pct)+'wId'
+    else:
+        input_stretch_str=args.stretch_pct
+
+    if hasattr(args,'unify_pos_neg_loss') and args.unify_pos_neg_loss:
+        pn_loss_str='uni'
+    else:
+        pn_loss_str='eq'
+    # all are nonzero
+    if args.train_noise_num*args.train_noise_prob*args.train_noise_level:
+        aug_str='_t{}p{}l{}'.format(args.train_noise_num,args.train_noise_prob,args.train_noise_level)
+    else:
+        aug_str=''
+
+    # print(args.eval_freq,'EVAL FREQ')
+    # wkwk
+    args_str='p{}fr{}'.format(args.patience,args.eval_freq)
+    if hasattr(args,'eval_train') and args.eval_train:
+        args_str+='T'
+    batch_str= args.batch_size if args.use_batch else 'n'
+    hpt_dir='e{}_{}_lr{}g{}lf_{}_strchinp{}_{}_b{}_l{}{}_pn{}'.format(args.epochs,args_str,args.lr,args.gamma,args.lr_reduce_freq,val_str,input_stretch_str,str_loss_str,batch_str,loss_type_str,aug_str,pn_loss_str)
 
 
     model_str="{}_{}_{}_{}_{}".format(hgcn_str,feat_str,c_str,inp_str,dp_str)
-    specific_dir=os.path.join(args.task,subset_str,"L{}".format(args.output_dim),model_str,hpt_dir)
+    specific_dir=os.path.join(args.task,'april',subset_str,"L{}".format(args.output_dim),model_str,hpt_dir)
     full_dir=os.path.join(meg_dir,specific_dir)
     print(model_str,'model')
     return full_dir

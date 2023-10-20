@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import pingouin as pg
 from statsmodels.stats.multitest import fdrcorrection
+from scipy import stats
 import matplotlib.pyplot as plt
 from matplotlib import patches as mpatches
 plt.style.use('seaborn')
@@ -747,7 +748,10 @@ def digest_stat_df(stat_df,stat_type,prob=False):
     return np.array(stat_df[cols_to_use]),cols_to_use
 
 def slice_metric_df(stat_df_full,label_col,conditionals='',title='',plot_save_path='',df_save_path=''):
-    if conditionals:
+    # has_conditionals = conditional_df
+    # print('conditionals')
+    # print(conditionals.shape)
+    if conditionals.shape:
         conditional_df=stat_df_full[conditionals]
     else:
         conditional_df=stat_df_full

@@ -1,10 +1,4 @@
 #!/usr/bin/env/python
-# Copyright (c) Facebook, Inc. and its affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-
 import argparse
 from datetime import datetime
 import random
@@ -76,7 +70,7 @@ manual_args will overwrite default if they exist
     # parser.add_argument('--batch_size', type=int, default=-1)
     # for distributed training
     parser.add_argument('--log-freq', type=int,default=5)
-    parser.add_argument('--eval-freq', type=int,default=2)
+    # parser.add_argument('--eval-freq', type=int,default=2)
 
     ## can ignore these two
     parser.add_argument("--local_rank", type=int)

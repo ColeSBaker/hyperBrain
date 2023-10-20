@@ -55,8 +55,10 @@ class PoincareBall(Manifold):
         ##BATCH
         norm = torch.clamp_min(x.norm(dim=-1, keepdim=True, p=2), self.min_norm)
         maxnorm = (1 - self.eps[x.dtype]) / (c ** 0.5)
+        # print(maxnorm,'MAX NORM',c)
         cond = norm > maxnorm
         projected = x / norm * maxnorm
+        
         return torch.where(cond, projected, x)
 
     def proj_tan(self, u, p, c):

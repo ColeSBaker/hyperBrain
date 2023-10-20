@@ -265,16 +265,23 @@ class HypAgg(Module):
                 frechet_B=self.args.frechet_B
             else:
                 frechet_B=None
+            # assert False,'IN HERE'
+            # self.frechet_agg_man = Frechet_Poincare(1/-self.c)
             self.frechet_agg_man = Frechet_Poincare(-self.c)
             # if len(x.shape)>2:
             
             output=frechet_agg(x=x,adj=adj,man = self.frechet_agg_man,B=frechet_B)
+            output = self.manifold.proj(output, c=self.c)
+            # print(output.shape)
+            # print(output,'output')
+
 
             self.most_recent['out']=output
             return output
 
         elif self.use_frechet_agg:
-            self.frechet_agg_man = Frechet_Poincare(-self.c)
+            assert False,'wrong spot'
+            self.frechet_agg_man = Frechet_Poincare(1/-self.c)
             output=torch.zeros_like(x)
             # output_oneper=torch.zeros_like(x)
             # print(x.shape)
@@ -283,6 +290,7 @@ class HypAgg(Module):
                 frech_B=self.args.frech_B_list[i]
                 # print(frech_B)
                 output_i=frechet_agg(x[i],adj[i], man=self.frechet_agg_man,B=frech_B)
+                output_i = self.manifold.proj(output_i, c=self.c)
                 output[i]=output_i
                 # output_oneper[i]=proj
 

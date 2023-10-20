@@ -97,43 +97,6 @@ class Norm(nn.Module):
             # print(std,'STANDARD')
             return self.weight * sub / std + self.bias  ### obviously gonna be tricky dealing with shit like this
 
-    # def forward_frechet(self, tensor, print_=False):
-    #     #### mmmmmmmm you could be onto something here with adding the frechet mean to this...
-    #     #### will take some extra thinking cap work... 
-    #     #### gonna have to understand frechet means a little better ;)
-    #     if self.norm is not None and type(self.norm) != str:
-    #         # batch norm
-    #         return self.norm(tensor)
-    #     elif self.norm is None:
-    #         return tensor
-
-    #     # print(tensor.shape,'tensor shape batch x numnodes x feats')
-    #     num_nodes = tensor.shape[0]
-    #     # batch_list = graph.batch_num_nodes
-    #     batch_list = [num_nodes]
-    #     batch_size = len(batch_list)
-    #     batch_list = torch.Tensor(batch_list).long().to(tensor.device)
-    #     batch_index = torch.arange(batch_size).to(tensor.device).repeat_interleave(batch_list)
-    #     batch_index = batch_index.view((-1,) + (1,) * (tensor.dim() - 1)).expand_as(tensor)
-
-    #     print(batch_index,'BATCH IT')
-    #     print(tensor.shape,'tensor shaps')
-    #     mean = torch.zeros(batch_size, *tensor.shape[1:]).to(tensor.device)
-    #     mean = mean.scatter_add_(0, batch_index, tensor)
-    #     mean = (mean.T / batch_list).T
-    #     mean = mean.repeat_interleave(batch_list, dim=0)
-    #     print(tensor.mean(axis=1))
-    #     print(mean,'MEAN sjape')
-    #     sub = tensor - mean * self.mean_scale
-
-    #     print(self.mean_scale,'mean scale')
-    #     std = torch.zeros(batch_size, *tensor.shape[1:]).to(tensor.device)
-    #     std = std.scatter_add_(0, batch_index, sub.pow(2))
-    #     std = ((std.T / batch_list).T + 1e-6).sqrt()
-    #     std = std.repeat_interleave(batch_list, dim=0)
-    #     print(std,'STANDARD')
-    #     return self.weight * sub / std + self.bias  ### obviously gonna be tricky dealing with shit like this_frec
-
 
 class RiemannianGroupNorm(nn.Module):
     def __init__(self, dim, manifold=Frechet_Poincare()):
@@ -175,45 +138,3 @@ class RiemannianGroupNorm(nn.Module):
         output = self.man.exp(on_manifold.unsqueeze(-2), input_logm)
 
         return output
-
-
-# class RiemannianBatchNorm(nn.Module):
-#     def __init__(self, dim, manifold=Frechet_Poincare()):
-#         super(RiemannianGroupNorm, self).__init__()
-#         self.man = manifold
-
-#         self.mean = nn.Parameter(self.man.zero_tan(self.man.dim_to_sh(dim)))
-#         self.var = nn.Parameter(torch.tensor(1.0))
-
-#         # statistics
-#         self.running_mean = None
-#         self.running_var = None
-#         self.updates = 0
-
-#     def forward(self, x, training=True, momentum=0.9,frechet_B=None):
-#         ### this is working as is because we don't have batches??-- but re
-#         num_nodes = x.shape[0]
-#         on_manifold = self.man.exp0(self.mean)
-
-#         # frechet mean, use iterative and don't batch (only need to compute one mean)
-#         # print(x.shape,'x shape')
-#         # print(x.T.shape,'t shape')
-#         input_mean = frechet_mean(x, self.man,frechet_B) ## mean per dimension, across node... fromo 
-#         input_var = self.man.frechet_variance(x, input_mean)
-#         # print(input_mean.shape,'MEAN SHAPE')
-#         # print(input_mean.shape,'VAR SHAPE')
-#         # transport input from current mean to learned mean
-#         input_logm = self.man.transp(
-#             input_mean,
-#             on_manifold,
-#             self.man.log(input_mean, x),
-#         )
-        
-#         # re-scaling
-#         # print(input_logm.shape,'logm')
-#         input_logm = (self.var / (input_var + 1e-6)).sqrt() * input_logm
-
-#         # project back
-#         output = self.man.exp(on_manifold.unsqueeze(-2), input_logm)
-
-#         return output

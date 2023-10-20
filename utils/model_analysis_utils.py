@@ -58,10 +58,12 @@ def save_embeddings(model_dir,save_special=False,overwrite=False):
     evaluate_inductive(model,['train','dev','test'],save_embeddings=True,save_dir=save_dir)
     create_res_df_model(model_dir,summary_outpath=summary_info_outpath)
     
-def save_embeddings_alternative(model_dir,config_override:dict):
+def save_embeddings_alternative(model_dir,config_override:dict={}):
     model=load_model(model_dir)
     setattr(model.args,'refresh_data',1)
-    assert config_override,'must give us something to override'
+    if not config_override:
+        print('NOT OVERRIDING ANYTHING')
+    # assert config_override,'must give us something to override'
     alt_str=''
     for arg,val in config_override.items():
         if not hasattr(model.args,arg):
@@ -72,9 +74,9 @@ def save_embeddings_alternative(model_dir,config_override:dict):
     if not os.path.exists(alt_dir):
         os.makedirs(alt_dir)
     else:
-        print('For now, not allowing overrides')
-        return alt_dir
-        assert 'For now, not allowing overrides'
+        print('overwritting previous alternate')
+        # return alt_dir
+        # assert 'For now, not allowing overrides'
     evaluate_inductive(model,['train','dev','test'],save_embeddings=True,save_dir=alt_dir)
     return alt_dir
 def load_model(model_dir,config_override={}):
@@ -280,8 +282,11 @@ def create_embeddings(model,data_loader_dicts,scan_info_outpath,embeddings_outdi
             embeddings = model.encode(data['features'], data['adj_mat'] ) #### to add into data-> data['nodeIDs']. may seem like overkill but I won't let us get fucked up again
             pos_scores = model.decode(embeddings, data['edges'])
             neg_scores = model.decode(embeddings, data['edges_false'])
+            # print(pos_scores.shape,'POS SCORES')
+            # print(neg_scores.shape,'POS SCORES')
             mean_rank,mAP,mean_degree=model.get_embedding_score(embeddings.detach().numpy(),data['edges'].detach().numpy())
-            spearman,pearson= model.get_embedding_correlation(embeddings.detach().numpy(),data['adj_original'].detach().numpy())
+            # spearman,pearson= model.get_embedding_correlation(embeddings.detach().numpy(),data['adj_original'].detach().numpy())
+            spearman,pearson=0,0
             node_num=data['labels'].shape[1]
             if not use_node_list:
                 embeddings_df[dim_cols]=embeddings[:node_num,:].detach().numpy()
@@ -490,16 +495,19 @@ def best_loss(model,split,stat_to_plot='roc'):
     loss_type = 'MSE' if model.args.use_weighted_loss else 'BCE'
     str_stat = stat_to_plot if stat_to_plot!= 'loss' else loss_type
     stats=model.metrics_tracker
-    losses=[t[stat_to_plot] for t in stats[split_str]]
+    try:
+        losses=[t[stat_to_plot] for t in stats[split_str]]
 
-    print('split')
-    print(stat_to_plot)
-    print(losses,'losses')
+        print('split')
+        print(stat_to_plot)
+        print(losses,'losses')
 
-    best_epoch = np.argmin(losses) if optimize=='min' else np.argmax(losses)
-    best_loss = losses[best_epoch]
-    str_train=str(best_loss)[:5]
-
+        best_epoch = np.argmin(losses) if optimize=='min' else np.argmax(losses)
+        best_loss = losses[best_epoch]
+        str_train=str(best_loss)[:5]
+    except:
+        best_loss=100
+        best_epoch=0
     return best_loss,best_epoch
 def plot_loss(model,stat_to_plot='roc',show=True,train_only=False):
     ### consider setting train back one.

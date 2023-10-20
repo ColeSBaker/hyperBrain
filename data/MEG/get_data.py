@@ -1,9 +1,4 @@
 #!/usr/bin/env/python
-# Copyright (c) Facebook, Inc. and its affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
 
 import sys, os
 # sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
@@ -23,6 +18,7 @@ import pandas as pd
 import networkx as nx
 from random import randint
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.model_selection import train_test_split
 # from sklearn.metrics import jaccard_score
 from utils.hgnn_utils import one_hot_vec
 from utils.math_utils import tanimoto_score
@@ -109,74 +105,41 @@ def preprocess(args):
             data_dict = graph_data_dict_recursive(args,scan,clinical,label_names,
                 atlas=atlas,norm_functions=norm_functions,noise_num=train_noise_num,noise_level=train_noise_level)
 
-            # edges,feats,labels,adj_prob,adj_noise = to_graph(args,scan,clinical,label_names,atlas=atlas,norm_functions=norm_functions)
-
-            # labels = np.array(labels).astype(float)
-            # feats = np.array(feats).astype(float)
-
             print(len(data_dict['edges']))
 
-            # data_dict= {
-            #     'targets': labels.tolist(),
-            #     'edges': edges,
-            #     'node_features': feats.tolist(),
-            #     'graph_id': str(clinical['Scan Index']),
-            #     'adj_prob': adj_prob.tolist(),
-            #     'noise_data':[]}
-
-            # print(data_dict_test,'testerr')
-            # print(data_dict,'old')
-            # print(data_dict_test['noise_data'][0]['edges']==data_dict_test['edges'])
-            # print([len(data_dict_test['noise_data'][i]['edges'])  for i in range(train_noise_num)] ,'before')
-            # print(len(data_dict_test['edges']),'before')
-            # # print(len(data_dict_test['noise_data']))
-            # print(data_dict['node_features'])
             num_feats=len(data_dict['node_features'][0])+1  ### to set args below
             # print(num_feats)  ## probably should just do this at start sum up numbers for each use__ and then add firt
             processed_data[section].append(data_dict)
             processed_data['all'].append(data_dict)
             
-            # print(args.num_features,'new')
-
-
-
             # dddd
             if file_count % 40 == 0:
                 print('finished processing: %d' % file_count, end='\r')
             file_count += 1
         print('%s: 100 %%      ' % (section))
-        # save the dataset
-        # print(processed_data[section].keys())
-        save_file = os.path.join(root,'meg_%s_%s_%s.json' % (section, dataset_str,args.adj_threshold))
-        # with open(save_file, 'w') as f:
-            # json.dump(processed_data[section], f)
-        if section=='train':
-            train_file=save_file
-        if section=='test':
-            test_file=save_file
-        if section=='valid':
-            valid_file=save_file
+
 
     if args.num_feature!=num_feats:
         print("ADJUSTING NUM FEATS")
         print(args.num_feature,' to ',num_feats)
         setattr(args,'num_feature',num_feats)
 
-    all_file = os.path.join(root,'meg_%s_%s_%s.json' % ('all', dataset_str,args.adj_threshold))
-    indx_file = os.path.join(root,'meg_%s_%s_latestindx.json' % ( dataset_str,args.adj_threshold))
+    # all_file = os.path.join(root,'meg_%s_%s_%s.json' % ('all', dataset_str,args.adj_threshold))
+    # indx_file = os.path.join(root,'meg_%s_%s_latestindx.json' % ( dataset_str,args.adj_threshold))
 
-    with open(all_file, 'w') as f:
-        json.dump(processed_data['all'], f)
+    # with open(all_file, 'w') as f:
+    #     json.dump(processed_data['all'], f)
 
-    # print(idxs_dict)
-    with open(indx_file, 'w') as f:
-        json.dump(idxs_dict, f)
+    # # print(idxs_dict)
+    # with open(indx_file, 'w') as f:
+        # json.dump(idxs_dict, f)
 
     print(len(all_idtest),'unique ids')
     print(file_count,'Final count')
     # pri
     # cant we get rid of these files??
-    return None,None,None,all_file,idxs_dict,indx_file
+    return None,None,None,None,idxs_dict,None,processed_data['all']
+    # return None,None,None,all_file,idxs_dict,indx_file,all_data
 
 def graph_data_dict_recursive(args,scan,clinical,label_names,atlas,norm_functions={},noise_num=0,noise_level=0,is_root=True):
     # print(scam)
@@ -232,7 +195,7 @@ def to_graph(args,scan,clinical,label_names,atlas,norm_functions={},return_label
 
     num_rois = scan.shape[3]  ### already narrowed down to one
     single_scan = scan[band_adj,metric_adj]  ## will take more work to do multi-edges
-    # print(add_noise,'ADD NOISE')
+    print(add_noise,'ADD NOISE')
     # print(single_scan[0,:],'FIRST')
     # sdd
     labels = clinical[label_names]
@@ -612,12 +575,14 @@ def get_scan_index_split_bygroup(clinical_data,in_group):
     clinical_val=clinical_data[~criteria]
     clinical_train=clinical_data[criteria]
 
+    indxs=clinical_val['Scan Index'].values.astype(int).tolist()
+
     print(clinical_val.shape)
     print(clinical_train.shape)
-
-    # sjskg
-    val_idx=clinical_val['Scan Index'].values[2:].astype(int).tolist()
-    test_idx=clinical_train['Scan Index'].values[0:2].astype(int).tolist()
+    test_idx,val_idx=train_test_split(indxs, test_size=.7)
+    # test_idx,val_idx=train_test_split(indxs, test_size=.5)
+    # val_idx,test_idx=train_test_split(indxs, test_size=.8)
+    # assert len(val_idx)>len(test_idx)
     return val_idx,test_idx
 
 
@@ -631,7 +596,10 @@ def get_scan_index_patient_split(clinical_data,val_pct,test_pct,pat_col = 'ID',u
 
     pats_full = clinical_data[pat_col].unique()
 
+# 
+# 
     print(use_exclude,'EXCLUSION')
+
     if use_exclude:
         pats= clinical_data[~criteria][pat_col].unique()
     else:
@@ -781,6 +749,7 @@ def dataset_split(download_clinical,download_MEG,val_pct=.2,test_pct=.1,val_subg
     print(idxs_dict,'DICT')
     # sss
     print(len(idxs_dict['train']),len(idxs_dict['test']),len(idxs_dict['valid']),'length')
+    assert (len(train_idx)+len(valid_idx)+len(test_idx))==len(all_scanids)
     return raw_data, idxs_dict
 
 
@@ -874,8 +843,9 @@ def create_norm_functions(args):    ##identity options, set to 0, set to 1, set 
 
     def add_noise_func(scan,rel_noise,mean=0):
         dataset_std=(np.std(data_flat))
-        # print(dataset_std,'dataset std')
-        # print(scan.std(),'single std')
+        print(dataset_std,'dataset std')
+        print(scan.std(),'single std')
+
         noise_mat = np.random.normal(mean,dataset_std*rel_noise,size=scan.shape)
         scan = scan+noise_mat
         return scan
@@ -1026,6 +996,11 @@ def create_norm_functions(args):    ##identity options, set to 0, set to 1, set 
         # print('other')
         # plt.hist(adj_prob_old.flatten(),bins=40)
         # plt.show()
+        # print(adj_prob.shape,'ADJ SHAPE')
+        # print(np.linalg.norm(adj_prob,axis=0).max())
+        # print(np.linalg.norm(adj_prob,axis=1).max())
+        # skks
+        # return adj_prob/(np.linalg.norm(adj_prob,axis=0).max()*2)
         return adj_prob
 
 

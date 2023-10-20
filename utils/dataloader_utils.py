@@ -121,20 +121,24 @@ def load_dataset(args,dataset_name):
         dataset_class= GraphDataset
         preprocess_func=preprocess
 
-    if hasattr(args,'refresh_data') and args.refresh_data>0:
-        train_file,dev_file,test_file,all_file,idxs_dict,indx_file = preprocess_func(args)
-        # args.train_file=train_file
-        # args.dev_file=dev_file
-        # args.test_file=test_file
-        args.all_file=all_file
-        # we should get rid of all of the file references... no need to every look back at something 
-        # that gets overwritten
-        args.idxs_dict=idxs_dict   ### important bc this won't change for any model
-        args.indx_file=indx_file ## this will be constantly overwritten
+    # if hasattr(args,'refresh_data') and args.refresh_data>0:
+    #     train_file,dev_file,test_file,all_file,idxs_dict,indx_file = preprocess_func(args)
+    #     # args.train_file=train_file
+    #     # args.dev_file=dev_file
+    #     # args.test_file=test_file
+    #     args.all_file=all_file
+    #     # we should get rid of all of the file references... no need to every look back at something 
+    #     # that gets overwritten
+    #     args.idxs_dict=idxs_dict   ### important bc this won't change for any model
+    #     args.indx_file=indx_file ## this will be constantly overwritten
 
-    train_dataset = dataset_class(args, split='train')
-    dev_dataset = dataset_class(args, split='dev')
-    test_dataset = dataset_class(args, split='test')
+
+    _,_,_,_,idxs_dict,_,all_data = preprocess_func(args)
+    setattr(args,'idxs_dict',idxs_dict)
+    # train_file,dev_file,test_file,all_file,idxs_dict,indx_file = preprocess_func(args)
+    train_dataset = dataset_class(args, split='train',full_dataset=all_data)
+    dev_dataset = dataset_class(args, split='dev',full_dataset=all_data)
+    test_dataset = dataset_class(args, split='test',full_dataset=all_data)
 
     train_sampler, dev_sampler, test_sampler = None, None, None
     # setattr(args,'use_batch',1)
@@ -147,7 +151,8 @@ def load_dataset(args,dataset_name):
     #cole. I fucking hate you. you are the fucking worst. by far.
     no_test=False
     if (len(train_dataset)+len(test_dataset)+len(dev_dataset))==180:
-        no_test=True
+        # no_test=True
+        pass
     if hasattr(args,'train_only') and args.train_only:
         if not (hasattr(args,'criteria_dict') and args.criteria_dict):
 

@@ -1,0 +1,2 @@
+,threshold,mAPs,Mean Ranks,Mean Degrees,ROC,BCE,mAPs_blind,Mean Ranks_blind,Mean Degrees_blind,ROC_blind,BCE_blind,Dev Loss,T Trained,Root
+0,0.329,0.9516631392199347,12.945353795114897,17.48109668109668,0.9880230290002888,0.5752405661110439,nan,nan,nan,nan,nan,0.03422686729755994,0.329,C:\Users\coleb\OneDrive\Desktop\Fall 2021\Neuro\hgcn\study\meg\lp\alpha_full_findc_4d\5

@@ -24,7 +24,7 @@ else:
     adj_threshold=band_thresholds[band]
 override_c=None
 # set_c
-use_override_c=False
+use_override_c=True
 BAND_TO_OPT_C= { 
            'alpha':.54,
            'gamma':.66,
@@ -45,8 +45,8 @@ overide_norm=1
 #     print('Cannot skip use norm without set c unless overridden')
 #     print('Use Norm set to 1')
 #     use_norm=1
-use_plv=1
-use_identity=0
+use_plv=0
+use_identity=1
 
 # model='HNN'
 model='HGCN'
@@ -85,6 +85,7 @@ def add_params(parser):
     parser.add_argument('--output_dim', type=int, default=3)
 
     parser.add_argument('--use_weighted_loss', type=int, default=1)
+    parser.add_argument('--use_weighted_bce', type=int, default=0)
 
     parser.add_argument('--band', type=str, default=band)
     parser.add_argument('--metric', type=str, default='plv')
@@ -100,7 +101,7 @@ def add_params(parser):
     parser.add_argument('--use_norm', type=int, default=use_norm)
 
     parser.add_argument('--use_batch', type=int, default=0)
-    parser.add_argument('--batch_size', type=int, default=8)
+    parser.add_argument('--batch_size', type=int, default=4)
     ## Cole added data args
     parser.add_argument('--refresh_data', type=int, default=1)
     parser.add_argument('--raw_clinical_file', type=str, default=os.path.join(os.getcwd(),'data/MEG/MEG.clinical.csv'))
@@ -122,7 +123,8 @@ def add_params(parser):
     parser.add_argument('--normalization', type=int, default=0)  ## ignore for now and let our guy take care of it 
 
     ##training config
-    parser.add_argument('--lr', type=float, default=0.021)
+    parser.add_argument('--lr', type=float, default=0.01)
+    # parser.add_argument('--lr', type=float, default=0.06)
     # parser.add_argument('--lr', type=float, default=0.02)
     parser.add_argument('--dropout', type=float, default=0)
     parser.add_argument('--cuda', type=float, default=0)
@@ -131,9 +133,12 @@ def add_params(parser):
     parser.add_argument('--optimizer', type=str, 
                         default=optimizer, choices=['Adam', 'RiemannianAdam']) 
     parser.add_argument('--momentum', type=float, default=0.999)
-    parser.add_argument('--patience', type=int, default=6)
+    parser.add_argument('--patience', type=int, default=2)
+    parser.add_argument('--eval_freq', type=int, default=5)
+    parser.add_argument('--eval_train', type=bool, default=False)
+    
     parser.add_argument('--sweep-c', type=float, default=0)
-    parser.add_argument('--lr-reduce-freq', type=float, default=20)
+    parser.add_argument('--lr-reduce-freq', type=float, default=10)
     parser.add_argument('--gamma', type=float, default=.9)
     parser.add_argument('--print-epoch', type=bool, default=True)
     parser.add_argument('--grad-clip', type=float, default=100)
@@ -142,9 +147,16 @@ def add_params(parser):
     parser.add_argument('--stretch_pct', type=int, default=95)
     parser.add_argument('--stretch_loss', type=int, default=95)
 
-    parser.add_argument('--stretch_sigmoid', type=int, default=1)
+    parser.add_argument('--stretch_sigmoid', type=int, default=0)
     parser.add_argument('--stretch_t', type=float, default=.03)
     parser.add_argument('--stretch_r', type=float, default=.34)
+
+    # unify_pos_neg_loss
+    parser.add_argument('--unify_pos_neg_loss', type=int, default=1)
+    parser.add_argument('--match_plv_inp_loss', type=int, default=0)
+    parser.add_argument('--plv_inp_raw', type=int, default=0)
+    parser.add_argument('--plv_norm_w_id', type=int, default=1)
+
 
 
     ##model_config
@@ -173,7 +185,7 @@ def add_params(parser):
     parser.add_argument('--use_frechet_agg', type=int, default=1)
     # parser.add_argument('--train_only', type=int, default=train_only)  #### now the one with val stuff.
     parser.add_argument('--use_val', type=int, default=1) 
-    parser.add_argument('--val_sub', type=int, default=1) 
+    parser.add_argument('--val_sub', type=int, default=0) 
 
     parser.add_argument('--train_noise_level', type=int, default=.01) 
     parser.add_argument('--train_noise_prob', type=int, default=.5) 
@@ -187,8 +199,8 @@ def add_params(parser):
     parser.add_argument('--normalize-feats', type=int, default=1)
     parser.add_argument('--normalize-adj', type=int, default=1)
     parser.add_argument('--normalize-id-treatment', type=str, default='raw',choices=['raw','set_to_max'])
-    parser.add_argument('--val-prop', type=int, default=.2)
-    parser.add_argument('--test-prop', type=int, default=.01)
+    parser.add_argument('--val-prop', type=int, default=.3)
+    parser.add_argument('--test-prop', type=int, default=.2)
 
     parser.add_argument('--criteria_dict', type=dict, default={'CogTr':1})
 

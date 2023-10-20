@@ -1,0 +1,4 @@
+,dir,loss,roc,gamma,c,lr-reduce-freq,lr,best_epoch
+0,C:\Users\coleb\OneDrive\Desktop\Fall 2021\Neuro\hgcn\study\meg\lp\alpha_full_setc_8d\1,"(0.03638407895629908, 0.036470184777556626)","(0.9850149493027389, 0.9858776268662068)",0.9,1.0,20,0.026,
+1,C:\Users\coleb\OneDrive\Desktop\Fall 2021\Neuro\hgcn\study\meg\lp\alpha_full_setc_8d\2,"(0.03611599775997589, 0.036627074018768586)","(0.985329694372346, 0.9855563054436516)",0.9,1.0,20,0.026,
+2,C:\Users\coleb\OneDrive\Desktop\Fall 2021\Neuro\hgcn\study\meg\lp\alpha_full_setc_8d\3,"(0.10694427652814747, 0.05651655184514601)","(0.9505177946190424, 0.9657401468000134)",0.9,1.0,20,0.026,

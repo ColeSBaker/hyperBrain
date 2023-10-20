@@ -29,7 +29,7 @@ import copy
 class GraphDataset(Dataset):
 
 	# def __init__(self, args, logger, split):
-	def __init__(self, args, split):
+	def __init__(self, args, split,full_dataset={}):
 		### add virtual node arguement
 		self.args = args
 		# self.logger = logger
@@ -38,52 +38,44 @@ class GraphDataset(Dataset):
 		print(self.args.train_only,'USES TRAIN ONLY')
 
 		if split=='special':
+			raise Exception('Phasing out all_file pattern')
 			self.dataset = json.load(open(self.args.special_file))
-		if hasattr(self.args,'idxs_dict'):
+
+
+		if full_dataset:
+			pass
+		else:
+			raise Exception('Phasing out all_file pattern')
 			full_dataset=json.load(open(self.args.all_file))
-			# full_dataset=json.load(open(self.args.all_file))
-			indx_dict=self.args.idxs_dict  ### if no indx_dict, read indx file
+		# full_dataset=json.load(open(self.args.all_file))
+		indx_dict=self.args.idxs_dict  ### if no indx_dict, read indx file
 
-			# print(indx_dict)
+		# print(indx_dict)
 
-			if (split=='train') and (hasattr(self.args,'train_only')) and (self.args.train_only):
-				self.indices=indx_dict['all']
-				print('TRAINING ON ALL DATA \n\n')
-				print("ALERT ALERT \n")
-				print("TRAINING ON ALL DATA")
+		if (split=='train') and (hasattr(self.args,'train_only')) and (self.args.train_only):
+			self.indices=indx_dict['all']
+			print('TRAINING ON ALL DATA \n\n')
+			print("ALERT ALERT \n")
+			print("TRAINING ON ALL DATA")
+		else:
+			if split=='dev':
+				self.indices=list(indx_dict['valid']) ## gotta fix inconsistencies
 			else:
-				if split=='dev':
-					self.indices=list(indx_dict['valid']) ## gotta fix inconsistencies
-				else:
-					self.indices=list(indx_dict[split])
+				self.indices=list(indx_dict[split])
 
 
-			# indices.sort()
-			print(self.indices,'SELF INDICES')
-			print([g['graph_id'] for g in full_dataset],'dta set indices')
-			self.dataset= [
-			g for g in full_dataset if int(g['graph_id']) in self.indices
-			]
-			if (split=='train') and (hasattr(self.args,'train_noise_level')) and (self.args.train_noise_level)>0 and (self.args.train_noise_num>0):
-				print('using noisy training')
-				self.use_noise=True
-				self.noise_prob=self.args.train_noise_prob
-			else:
-				self.use_noise=False
-
-
-
-		elif split == 'train':
-			# print(self.args.train_file,'trained')
-			# setattr(self.args,'frech_B_dict','')
-			# print(open(self.args.train_file),'lets see?')
-			# print(self.args,'ALL ARGS')
-
-			self.dataset = json.load(open(self.args.train_file))
-		elif split == 'dev':
-			self.dataset = json.load(open(self.args.dev_file))
-		elif split == 'test':
-			self.dataset = json.load(open(self.args.test_file))
+		# indices.sort()
+		print(self.indices,'SELF INDICES')
+		print([g['graph_id'] for g in full_dataset],'dta set indices')
+		self.dataset= [
+		g for g in full_dataset if int(g['graph_id']) in self.indices
+		]
+		if (split=='train') and (hasattr(self.args,'train_noise_level')) and (self.args.train_noise_level)>0 and (self.args.train_noise_num>0):
+			print('using noisy training')
+			self.use_noise=True
+			self.noise_prob=self.args.train_noise_prob
+		else:
+			self.use_noise=False
 
 
 		self.shape=self.shape()
@@ -137,12 +129,12 @@ class GraphDataset(Dataset):
 				pass
 			# print(no_draw)
 
-
 		copytime = datetime.now()
 		use_virtual = self.use_virtual
 		# print(use_virtual,'USE VIRTUAL')
 
 		adj_prob=torch.tensor(graph['adj_prob'])
+		adj_original=torch.tensor(graph['adj_original'])
 		# print(adj_prob.shape,'ADJ SHAPE')
 		# eee
 		# use_virtual=False
@@ -182,68 +174,6 @@ class GraphDataset(Dataset):
 		neg_edges = np.array(list(zip(x, y))).astype(int)
 		np.random.shuffle(neg_edges)
 		neg_edges = torch.tensor(neg_edges).long()
-
-
-		# adj_mat_weight=np.array(graph['adj_prob'])
-		# full_weighted_adj=False
-		# weighted_adj=False
-		# add_to_existing_graph=False
-		# continuous_thresh=True
-		# if not weighted_adj:
-		# 	full_weighted_adj=False
-
-		# use_virtual= False if full_weighted_adj else True
-
-		# print(np.percentile(adj_mat_weight,78),'PERCENTILE??')
-		# print(np.percentile(adj_mat_weight,90),'PERCENTILE??')
-		# adj_mat = nx.adjacency_matrix(nx_old,'old') 
-		# if weighted_adj:
-		# 	if full_weighted_adj:
-		# 		nx_graph_new = nx.convert_matrix.from_numpy_matrix(adj_mat_weight)
-		# 	# el
-		# 	else:
-		# 		low_thresh =5000
-		# 		high_thresh = .7
-		# 		low_mat = np.where(adj_mat_weight>low_thresh,.5,0)
-		# 		high_mat = np.where(adj_mat_weight>high_thresh,1+adj_mat_weight,0)
-		# 		# high_mat = np.where(adj_mat_weight>high_thresh,2,0)
-		# 		full_mat = high_mat+low_mat ## should never overlap 
-		# 		nx_graph_new = nx.convert_matrix.from_numpy_matrix(full_mat)
-		# # print([n for n in nx_old],'old nodes first')
-		# if add_to_existing_graph:
-		# 	# print('add_to_existing_graph')
-		# 	try:
-		# 		nx_graph_new
-		# 	except:
-		# 		print('no new grah')
-		# 	for e in nx_graph_new.edges():
-		# 		weight = nx_graph_new.get_edge_data(e[0], e[1], default=None)['weight']
-		# 		if nx_graph.has_edge(e[0],e[1]):
-		# 			nx_graph.remove_edge(e[0],e[1])
-		# 		nx_graph.add_edge(e[0],e[1],weight=weight)
-		# 		# nx_graph.add_edge(e[0],e[1])
-		# 		# nx_graph.add_edge(e)
-		# print('a')
-		if (hasattr(self.args, 'continuous_thresh') and self.args.continuous_thresh>0):
-			# print('continously')
-			for e in nx_graph.edges():
-				# weight = nx_graph_new.get_edge_data(e[0], e[1], default=None)['weight']
-				# if nx_graph.has_edge(e[0],e[1]):
-				nx_graph.remove_edge(e[0],e[1])
-				weight=adj_prob[e[0],e[1]]
-				# print(weight,'WEIGHT')
-				nx_graph.add_edge(e[0],e[1],weight=adj_prob[e[0],e[1]])
-		# else:
-			# fuck
-		# # adj_mat = nx.adjacency_matrix(nx_old)
-		# print(adj_mat,'ADJ MAT') 
-		# adj_mat = nx.adjacency_matrix(nx_graph) 
-		# print(adj_mat.shape,'ADJ MAT NEW')
-		# adj_mat=adj_mat/2
-		# ssss
-		# print(nx_graph,'graphy graphy what are you? have you changed',nx_old)
-		# print([n for n in nx_old],'old nodes mid')
-
 
 
 		# print(use_virtual,'USE VIRTUAL')
@@ -345,29 +275,7 @@ class GraphDataset(Dataset):
 				print(e)
 				raise Exception("VIRTUAL EDGE IN POS EDGES ALERT ALERT ALERT ")
 
-		# for e in neg_edges:
-		# 	if e[0]==e[1]:
 
-		# 		print(e)
-		# 		raise Exception("SELF EDGE IN POS EDGES ALERT ALERT ALERT ")
-		# 	if (e[0]==node_num) or (e[1]==node_num):
-		# 		print(e)
-		# 		raise Exception("VIRTUAL EDGE IN POS EDGES ALERT ALERT ALERT ")
-		# print(node_feature.shape,'Node Feat')
-		# print(adj_mat.shape,'ADJ MAT SHAPE')
-		# print(pos_edges.shape,'POS EDGE')
-		# print(neg_edges.shape,'Neg EDGE')
-
-		# print(adj_prob.shape,'ADJ PROB\n\n\n')
-		# print(np.percentile(adj_prob,20),20)
-		# print(np.percentile(adj_prob,80),'80')
-		# 20_pct =.057
-		# 80_pct = .45
-		# adj_conn = adj_prob<
-		# print(adj_mat,'ADJ MAT')
-		# print(adj_mat.shape,'91x91 right?')
-		# print(np.isnan(adj_mat),'INPUT NANS')
-		# print(adj_prob)
 		return  {
 		          'features': node_feature,
 		          'adj_mat': adj_mat,
@@ -377,30 +285,11 @@ class GraphDataset(Dataset):
 		          'labels': labels,
 		          'graph_id':graph_id,
 		          'adj_prob':adj_prob,
+		          'adj_original':adj_original,
 		          # 'len_edges':pos_edges.shape[0],
 		          # 'len_edges_false':neg_edges.shape[0]}
 		          }
-		# try:
-		# 	return  {
-		# 	          'features': node_feature,
-		# 	          'adj_mat': adj_mat,
-		# 	          # 'weight': weight,
-		# 	          'edges':pos_edges,  ### can slice down to len 2 here
-		# 	          'edges_false':neg_edges, ### do sample or calculate all
-		# 	          'labels': labels,
-		# 	          'graph_id':graph_id,
-		# 	          'adj_prob':adj_prob
-		# 	        }
-		# except:
-		# 	return  {
-  #         'features': node_feature,
-  #         'adj_mat': adj_mat,
-  #         # 'weight': weight,
-  #         'edges':pos_edges,  ### can slice down to len 2 here
-  #         'edges_false':neg_edges, ### do sample or calculate all
-  #         'labels': labels,
-  #         'graph_id':graph_id
-  #       }
+
 
 
 	# def create_edge_list():
@@ -494,66 +383,6 @@ class GraphDataset(Dataset):
 		# saas
 		return stacked_graphs,stacked_labels,stacked_graphids
 
-
-	# def stack_all(self):
-
-	# 	stacked_graphs = np.zeros(self.shape) ### right now will only work for meg or data with set num nodes ## will need to adjust self.shape to deal with max. either way shouldn't be used with larger sets
-	# 	stacked_labels = np.zeros((len(self.dataset)))
-	# 	stacked_graphids = np.zeros((len(self.dataset)))
-	# 	graph_ids =set([])
-
-	# 	if self.shape[0]*self.shape[1]>1000000:
-	# 		print("CAREFUL THIS COULD BE UUUUUGE")
-
-
-	# 	for i in range(len(self.dataset)):
-	# 		graph = self[i] 
-	# 		graph_id = graph['graph_id']
-
-	# 		label = graph['labels'][0]   ## only get label for first node bc all are the same
-
-	# 		if int(float(graph_id)*10) != int(graph_id)*10:
-	# 			print(graph_id,' NOT WHOLE NUMBER')
-
-	# 		graph_id=int(graph_id)
-	# 		# nx_Graph = 
-	# 		# print(graph_id)
-	# 		nx_graph =nx.Graph()
-
-	# 		# print(graph['features'].shape,'huh')
-	# 		node_num = self.node_num(i)
-	# 		# print(node_num,'????????')
-
-	# 		nx_graph.add_nodes_from([i for i in range(node_num)])
-	# 		# print(graph['edges'])
-	# 		# print(nx_graph.number_of_nodes(),'nodes before>????')
-	# 		for e in graph['edges']:
-	# 			# if e[]
-	# 			nx_graph.add_edge(int(e[0]),int(e[1]))
-	# 		# nx_graph.add_edges_from(graph['edges'])
-
-	# 		# print(nx_graph.number_of_nodes(),'nodes')
-	# 		# print(nx_graph.number_of_edges(),'edges')
-	# 		# sp.csr_matrix(adj_mat)
-	# 		# adj_mat =sp.csr_matrix(nx.adjacency_matrix(nx_graph)).to_dense()
-	# 		adj_mat =nx.adjacency_matrix(nx_graph).todense()
-	# 		for z in range(adj_mat.shape[0]): ### assert balance
-	# 			for j in range(adj_mat.shape[1]):
-	# 				if adj_mat[z,j]>0:
-	# 					assert adj_mat[j,z]==adj_mat[z,j]
-
-	# 		if graph_id in graph_ids:
-	# 			raise Exception("DOUBLE GRAPH ID")
-	# 		stacked_graphs[i]=adj_mat
-	# 		stacked_labels[i]=label
-	# 		stacked_graphids[i]=graph_id
-	# 	print(stacked_graphs,stacked_labels,'final!!')
-	# 	# saas
-	# 	return stacked_graphs,stacked_labels,stacked_graphids
-	# 					# break
-			# print(adj_mat.shape)
-			# print(adj_mat,'adj mat')
-			# sddkgs
 
 	def poincare_embeddings_all(self,output_rel_dir,output_emb_dir,add_self=True):  ## really no reason for this to be a dataset function? but it will keep things organized
 		self.stack_all()
@@ -681,6 +510,7 @@ def transform_input(graph_og,args,use_noise=False):
 	if use_noise:
 		draw_p=np.random.uniform(0,1)  
 		if draw_p<args.noise_prob:  ### if self.noise_prib<0, add og to noise data and draw from that ?
+			print('adding noise!!')
 			noise_data=graph['noise_data']
 			draw_graph=np.random.choice(np.arange(len(noise_data)))
 			# print(draw_graph,'DRAW GRAPH')
@@ -690,6 +520,7 @@ def transform_input(graph_og,args,use_noise=False):
 			pass
 	use_virtual=args.use_virtual
 	adj_prob=torch.tensor(graph['adj_prob'])
+	adj_original=torch.tensor(graph['adj_original'])
 	if 'graph_id' not in graph.keys():
 		raise Exception('hold up there buster youre out of data')
 	graph_id = graph['graph_id']

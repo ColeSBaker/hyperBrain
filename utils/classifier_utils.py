@@ -1,4 +1,14 @@
-    
+from classifiers.CustomClassifiers import AggregateClassifier,AggregateClassifierGrid
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score, classification_report, f1_score,roc_auc_score
+from sklearn.model_selection import cross_val_predict,GridSearchCV,StratifiedKFold,LeaveOneOut,train_test_split
+from sklearn.metrics import roc_auc_score, average_precision_score
+from sklearn.preprocessing import normalize
+from sklearn.cluster import KMeans
+from sklearn.model_selection import StratifiedShuffleSplit,RepeatedStratifiedKFold
+import numpy as np
+import pandas as pd
+from copy import deepcopy
 def run_combos_list(model_type,feature_list,names=[],times=2,
     use_agg=False,agg_fit=None,agg_pred=None,
     hyp_search=True,passed_params=None,y_comb=[],
@@ -10,18 +20,9 @@ def run_combos_list(model_type,feature_list,names=[],times=2,
             assert agg_fit is not None
             assert agg_pred is not None
             if agg_fit=='split_sample' and agg_pred=='same':
-                ## BRO WHAT???? THIS IS CHEATING ISN"T IT????
                 temp_model=AggregateClassifier(model_type,fit_method=agg_fit,predict_method=agg_pred)
                 X,y=temp_model.reform_inputs(X,y) ### only use temp model for this reform
                 
-                
-            print(y.shape,'y?')
-            print(X.shape,'X')
-            print(passed_params,'PASS')
-            # X_norm = MinMaxScaler().fit_transform(X)
-            # res=make_classifier_agg(X,y,base_model=model_type,
-            #             fit_method=agg_fit,predict_method=agg_pred,
-            #                         hyp_search=hyp_search,passed_params=passed_params)
             if use_nested:
                 res=make_classifier_nested(X,y,base_model=model_type,
                         fit_method=agg_fit,predict_method=agg_pred,
@@ -34,8 +35,6 @@ def run_combos_list(model_type,feature_list,names=[],times=2,
             return res
         else:
             return make_classifier(X,y=y,model=model_type)
-
-#     print()
     f1_list=np.zeros((len(feature_list),times))
     roc_list=np.zeros((len(feature_list),times))
     for t in range(times):
@@ -45,13 +44,11 @@ def run_combos_list(model_type,feature_list,names=[],times=2,
             res=execute(feats,y=y_comb)
             f1_list[i,t]=res[0]
             roc_list[i,t]=res[1]
-#             f1_list[i,t]=i
-#             roc_list[i,t]=i
-    
     f1_means=f1_list.mean(axis=1)
     roc_means=roc_list.mean(axis=1)
     for j in range(len(f1_means)):
         print(f1_means[j],roc_means[j],names[j])
+    return names,f1_means,roc_means
 
     
 def run_combos(model_type,times=2,use_agg=False,agg_fit=None,agg_pred=None,hyp_search=True,passed_params=None):
@@ -155,8 +152,8 @@ def run_combos(model_type,times=2,use_agg=False,agg_fit=None,agg_pred=None,hyp_s
 
 base_param_grid_svc = [
 #   {'C': [.2,.5,1, 10, 1000], 'kernel': ['linear']},
-  {'C': [.3,1, 10,100], 'gamma': [1,.5,.1], 'kernel': ['rbf'],'class_weight':['balanced']},
-    {'C': [.3,1, 10, 200], 'degree': [2,3], 'kernel': ['poly'],'class_weight':['balanced']},
+  {'C': [.1,.3,.5,1,2, 10,100], 'gamma': [10,1,.5,.1], 'kernel': ['rbf'],'class_weight':['balanced']},
+    # {'C': [.3,1, 10, 200], 'degree': [2,3], 'kernel': ['poly'],'class_weight':['balanced']},
  ]
 # base_param_grid_svc = [
 #   # {'C': [.1,.2,.5,1, 10,100, 1000], 'kernel': ['linear'],'class_weight':['balanced']},
@@ -415,12 +412,6 @@ def make_classifier_agg(X,y,base_model,fit_method='concatenate',
         
 #         splitter = StratifiedKFold(n_splits=5,shuffle=True)
         splitter = LeaveOneOut()
-#         plitter = StratifiedShuffleSplit(n_splits=20, test_size=.2)
-
-#         print(best_model,"BEST MODEL ")
-#         print(use_params,'BEST PARAMS')
-#         print(base_model,'base model>')
-#         print(best_model.base_model,'BASE_MODEL')
         print('NEW!')
         print(y,'EXAMPLE Y')
         print(y.shape,'EXAMPLE Y')
@@ -445,13 +436,6 @@ def make_classifier_agg(X,y,base_model,fit_method='concatenate',
            roc_prob=proba
         else:
             roc_prob=proba[:,1]
-#         print(prediction,'PREDs')
-#         print(proba,'PROBA')
-#         roc_prob=proba
-#         print(prediction.shape,'huh') 
-#         print(y.shape,'y')
-#         print(pre)
-#         f1 = f1_score(y, pred, average='macro')
         f1 = f1_score(y, prediction, average='macro')
         print(classification_report(y, prediction))
         print(accuracy_score(y, prediction),'accuracy')

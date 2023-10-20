@@ -1,0 +1,2 @@
+,dir,loss,roc,gamma,c,lr-reduce-freq,lr,best_epoch
+0,C:\Users\coleb\OneDrive\Desktop\Fall 2021\Neuro\hgcn\study\meg\lp\alpha_novirt_findc_4d\1,"(0.033332396108742585, 0.03295316313606269)","(0.989108694810515, 0.9893774880331276)",0.9,0.27407746178062997,20,0.02,

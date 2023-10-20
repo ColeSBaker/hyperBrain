@@ -10,6 +10,7 @@ class Poincare(Manifold):
         # print(self)
         # print(Manifold)
         # sadsd
+        
         super(Poincare, self).__init__()
         self.edge_eps = 1e-3
         try:

@@ -71,10 +71,6 @@ class LinearDecoder(Decoder):
         # print(self.c,'C MONEY')
         h = self.manifold.proj_tan0(self.manifold.logmap0(x, c=self.c), c=self.c)
 
-        # print(min(h[:,0]),max(h[:,0]),'H man')
-        # print(min(h[:,1]),max(h[:,1]),'H man')
-        # print(h.isnan().any(),'H nan')
-        # print('mapped')
         return super(LinearDecoder, self).decode(h, adj)
 
     def extra_repr(self):

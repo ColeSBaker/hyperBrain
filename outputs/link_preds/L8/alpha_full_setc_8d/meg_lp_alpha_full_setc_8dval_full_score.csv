@@ -1,0 +1,3 @@
+,threshold,mAPs,Mean Ranks,Mean Degrees,ROC,ROCDist,BCE,mAPs_blind,Mean Ranks_blind,Mean Degrees_blind,ROC_blind,ROCDist_blind,BCE_blind,Dev Loss,T Trained,Root,ID
+0,0.329,0.949907649,13.75790907,18.44928167,0.985140732,0.985140732,0.601237868,0.949907649,13.75790907,18.44928167,0.985140732,0.985140732,0.601237868,0.036470185,0.329,C:\Users\coleb\OneDrive\Desktop\Fall 2021\Neuro\hgcn\study\meg\lp\alpha_full_setc_8d\1,0
+0,0.329,0.951296092,14.10892402,18.99742056,0.984827271,0.984827271,0.603135563,0.951296092,14.10892402,18.99742056,0.984827271,0.984827271,0.603135563,0.036627074,0.329,C:\Users\coleb\OneDrive\Desktop\Fall 2021\Neuro\hgcn\study\meg\lp\alpha_full_setc_8d\2,1

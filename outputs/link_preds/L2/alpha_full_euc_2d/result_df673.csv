@@ -1,0 +1,7 @@
+,dir,loss,roc,gamma,c,lr-reduce-freq,lr,best_epoch
+0,C:\Users\coleb\OneDrive\Desktop\Fall 2021\Neuro\hgcn\study\meg\lp\alpha_full_euc_2d\1,"(0.16544038148913062, 0.1691702440368472)","(0.8576965037360691, 0.8606857403942805)",0.9,1.0,20,0.026,
+1,C:\Users\coleb\OneDrive\Desktop\Fall 2021\Neuro\hgcn\study\meg\lp\alpha_full_euc_2d\2,"(0.16689268099863755, 0.16679725865823256)","(0.8524711348600059, 0.8544261521937752)",0.9,1.0,20,0.026,
+2,C:\Users\coleb\OneDrive\Desktop\Fall 2021\Neuro\hgcn\study\meg\lp\alpha_full_euc_2d\3,"(0.1677872842340626, 0.16590660326404835)","(0.8528862418687134, 0.8584118477991175)",0.9,1.0,20,0.026,
+3,C:\Users\coleb\OneDrive\Desktop\Fall 2021\Neuro\hgcn\study\meg\lp\alpha_full_euc_2d\4,"(0.16963511185975605, 0.16450896339322532)","(0.853452912598328, 0.8556579596864261)",0.9,1.0,20,0.026,
+4,C:\Users\coleb\OneDrive\Desktop\Fall 2021\Neuro\hgcn\study\meg\lp\alpha_full_euc_2d\5,"(0.16903678990339152, 0.16038487780826138)","(0.8516919372317969, 0.8530262000285767)",0.9,1.0,20,0.026,
+5,C:\Users\coleb\OneDrive\Desktop\Fall 2021\Neuro\hgcn\study\meg\lp\alpha_full_euc_2d\6,"(0.16800225274501013, 0.17045484235283684)","(0.8562247662482014, 0.8651893774853854)",0.9,1.0,20,0.026,

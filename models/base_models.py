@@ -21,6 +21,8 @@ from utils.EarlyStoppingCriterion import EarlyStoppingCriterion
 import random
 import math
 from datetime import datetime
+import scipy
+from matplotlib import pyplot as plt
 class BaseModel(nn.Module):
     """
     Base model for graph embedding tasks.
@@ -36,11 +38,22 @@ class BaseModel(nn.Module):
                 self.c = self.c.to(args.device)
         else:
             self.c = nn.Parameter(torch.Tensor([1.]))
+
         self.manifold = getattr(manifolds, self.manifold_name)()
         if self.manifold.name == 'Hyperboloid':
             args.feat_dim = args.feat_dim + 1
         # self.nnodes = args.n_nodes ##we won't know ahead of time
+        print(getattr(encoders, args.model),'aTTRs')
+        print(args.num_feature,'NUMBER FEATs')
         self.encoder = getattr(encoders, args.model)(self.c, args)
+        # print('big adjustment')
+        self.c=self.encoder.layers[-1].agg.c
+        # self.encoder.layers[-1].agg.c=self.c
+        
+        # self.encoder.layers[-1].agg.c=self.c
+
+        # print(self.c,'SLEF C')
+        # print(self.encoder.layers[-1].agg.c,'SLEF C')
         # self.EarlyStoppingCriterion(args.patience,'max')
 
         # print(hasattr(args,'pruner'))
@@ -88,266 +101,17 @@ class BaseModel(nn.Module):
         for param in self.parameters():
             param.requires_grad = True
 
-
-class NCModel(BaseModel):
-    """
-    Base model for node classification task.
-    """
-
-    def __init__(self, args):
-        super(NCModel, self).__init__(args)
-        self.decoder = model2decoder[args.model](self.c, args)
-        self.fd = FermiDiracDecoder(r=args.r, t=args.t)
-        self.use_lp_reg = hasattr(args,'use_lp_reg') and args.use_lp_reg>0
-        self.lp_lr_prop= 1 if not (hasattr(args,'lp_lr_prop') and args.lp_lr_prop>0) else args.lp_lr_prop
-        self.task='nc'
-        if args.n_classes > 2:
-            self.f1_average = 'micro'
-        else:
-            self.f1_average = 'binary'
-
-        if args.pos_weight:
-            self.weights = torch.Tensor([1., 1. / data['labels'][idx_train].mean()])
-        else:
-            self.weights = torch.Tensor([1.] * args.n_classes)
-        if not args.cuda == -1:
-            self.weights = self.weights.to(args.device)
-
-        if (not hasattr(args,'is_inductive')) or  (not args.is_inductive):
-            self.is_inductive=False
-        else:
-            self.is_inductive=True
-
-    def decode(self, h, adj, idx): ###### we could average all this shit? ### NEED TO CREATE GRAPH PRED
-
-
-        # print(h.isnan().any(        # print(min(h[:,0]),max(h[:,0]),'H man')
-        # print(min(h[:,1]),max(h[:,1]),'H man')),'H nan')
-        output = self.decoder.decode(h, adj) ### simply change decoder to allow
-        # print(output.shape,'outpoizzlse')
-        # print(min(output[:,0]),max(output[:,0]),'output1')
-        # print(min(output[:,1]),max(output[:,1]),'output1')
-        # softmax = F.softmax(output)
-        # logsoftmax = torch.log(softmax)
-        # print(softmax.isnan().any(),'soft nans')
-        # print(logsoftmax.isnan().any(),'soft log nans')
-        # print(softmax.shape,'SOFT SHAPE')
-        # print(min(softmax[:,0]),max(softmax[:,0]),'softies1')
-        # print(min(softmax[:,1]),max(softmax[:,1]),'softies2')
-
-        # print(min(logsoftmax[:,0]),max(logsoftmax[:,0]),'logsofties1')
-        # print(min(logsoftmax[:,1]),max(logsoftmax[:,1]),'logsofties2')
-        # print(logsoftmax.shape,'LOG SOFT!')
-        # norm1= output[:,0]/totals
-        # norm2= output[:,1]/totals
-        # # print(norm.shape)
-        # print(min(norm1),max(norm1),'EYYYYY')
-        # print(min(norm2),max(norm2),'EYYYYY')
-        # print(F.log_softmax(output[idx], dim=1).shape,'full shape')
-        # print(min(F.log_softmax(output[idx], dim=1)[:,0]),max(F.log_softmax(output[idx], dim=1)[:,0]),'full')
-        # print(min(F.log_softmax(output[idx], dim=1)[:,1]),max(F.log_softmax(output[idx], dim=1)[:,1]),'full')
-        # print(F.log_softmax(output[idx], dim=1).isnan().any(),'soft final')
-        return F.log_softmax(output[idx], dim=1)
-    def decide_lp(self,h,idx):
-        normalize_euc=False
-        if normalize_euc and self.manifold_name == 'Euclidean':
-            h = self.manifold.normalize(h)
-        emb_in = h[idx[:, 0], :]
-        emb_out = h[idx[:, 1], :]
-        sqdist = self.manifold.sqdist(emb_in, emb_out, self.c)
-        probs = self.fd.forward(sqdist)
-        return probs
-    def lp_reg_loss(self, embeddings, data, split,use_pred=True):
-        if not self.is_inductive:
-            edges_false = data[f'{split}_edges_false'] ### goddammit why are you so stupid- this is where the split happens shitbird
-            edges = data[f'{split}_edges']
-        else: ## because train / val splits naturally are unbalanced-- maybe try one without balancing?
-            edges_false = data['edges_false']
-            edges = data['edges'] 
-        sample_rate = 1
-        if split == 'train': 
-        #     ### here we should sample ?
-            edges_false = edges_false[np.random.randint(0, len(edges_false),len(edges)*sample_rate)]
-
-        # edges_false = edges_false[np.random.randint(0, len(edges_false),len(edges))]
-        pos_scores = self.decide_lp(embeddings, edges)
-        neg_scores = self.decide_lp(embeddings, edges_false)
-        labels = [1] * pos_scores.shape[0] + [0] * neg_scores.shape[0]
-        preds = list(pos_scores.data.cpu().numpy()) + list(neg_scores.data.cpu().numpy())
-        roc = roc_auc_score(labels, preds)
-
-        if use_pred:
-            loss = F.binary_cross_entropy(pos_scores, torch.ones_like(pos_scores)) ### is this average or sum??
-            # print(loss,'pos loss')
-            neg_loss=F.binary_cross_entropy(neg_scores, torch.zeros_like(neg_scores))
-            # print(neg_loss,'neg loss')
-            loss+=neg_loss
-        else:
-            loss = self.distance_loss(embeddings,edges,edges_false)
-
-        return loss,roc
-    def distance_loss(self,h,edges,edges_false,num_sample=2):
-
-        ### gotta be smarter with this... could basically loop through edges false and match up embeddings
-        true_samples = []
-        true_in = h[edges[:, 0], :]
-        true_out = h[edges[:, 1], :]
-
-        false_in =  h[edges_false[:, 0], :]
-        false_out =  h[edges_false[:, 1], :]
-
-        true_dist=self.manifold.sqdist(true_in, true_out, self.c).mean()  ## so can be arb samples
-        false_dist=self.manifold.sqdist(false_in, false_out, self.c).mean()
-        loss = true_dist-false_dist
-
-        return loss
-    def compute_metrics(self, embeddings, data, split):
-        idx = data[f'idx_{split}']
-        # print(idx,'INDEX')
-        # idx = [i for i in range(data['adj_train_norm'].shape[0])]
-        # print(idx,'INDEX')
-        # print(data['labels'],'labels')
-
-        output = self.decode(embeddings, data['adj_train_norm'], idx)
-        pred_loss = F.nll_loss(output, data['labels'][idx], self.weights)
-        loss = pred_loss
-        use_pred=True
-        reg_loss,lp_roc = self.lp_reg_loss(embeddings,data,split,use_pred)
-        # print(pred_loss,'SHOULD BE POSITIVE!!!!!')
-        # print(reg_loss,'reg_loss')
-        if self.use_lp_reg:
-            
-            loss=(reg_loss*self.lp_lr_prop)+loss
-
-        
-        # print(idx,'ind')
-        acc, f1 = acc_f1(output, data['labels'][idx], average=self.f1_average)
-        # metrics = {'loss': loss, 'acc': acc, 'f1': f1}
-        # print(pred_loss,'SHOULD BE POSITIVE!!!!!')
-        # print(loss,'loss!')
-        metrics = {'loss': loss, 'acc': acc, 'f1': f1,'pred_loss':pred_loss,'lp_loss':reg_loss,'lp_roc':lp_roc,'num_total':len(idx)}
-        return metrics
-
-    def init_metric_dict(self):
-        return {'acc': -1, 'f1': -1}
-
-    def has_improved(self, m1, m2):
-        return m1["f1"] < m2["f1"]
-
-
-
-
-    def reset_epoch_stats(self, epoch, prefix):
-        """
-        prefix: train/dev/test
-        """
-        self.epoch_stats = {
-            'prefix': prefix,
-            'epoch': epoch,
-            'loss': 0,
-            'pred_loss':0,
-            'lp_loss':0,
-            'lp_roc':0,
-            'acc': 0,
-            'f1': 0,
-            'num_correct': 0,## add to acc_f1 funct
-            'num_total': 0,
-            'num_graphs': 0,
-        }
-        return
-
-    # def update_epoch_stats(self, embeddings, data, split):
-    def update_epoch_stats(self, metrics, split):
-        # with th.no_grad():
-        with th.no_grad():
-            ## if loss is mean but num total scales with batch size, will lead to problem
-
-            # metrics = {'loss': loss, 'acc': acc, 'f1': f1}
-            self.epoch_stats['loss'] += metrics['loss'].item()
-            self.epoch_stats['pred_loss'] += metrics['pred_loss'].item()
-            self.epoch_stats['lp_loss'] += metrics['lp_loss'].item()
-            self.epoch_stats['acc'] += metrics['acc'].item()
-            self.epoch_stats['f1'] += metrics['f1'].item()
-            self.epoch_stats['num_total'] += metrics['num_total']
-            self.epoch_stats['num_graphs'] += 1
-            self.epoch_stats['num_correct'] = self.epoch_stats['num_graphs']*self.epoch_stats['acc'] ## no good for how were doing it
-            # idx = data[f'idx_{split}']
-            # output = self.decode(embeddings, data['adj_train_norm'], idx)
-            # loss = F.nll_loss(output, data['labels'][idx], self.weights)
-            # acc, f1 = acc_f1(output, data['labels'][idx], average=self.f1_average)
-            # metrics = {'loss': loss, 'acc': acc, 'f1': f1}
-            # self.epoch_stats['loss'] += loss.item()
-            # self.epoch_stats['acc'] += acc.item()
-            # self.epoch_stats['f1'] += f1.item()
-            # self.epoch_stats['num_total'] += label.size(0)
-            # self.epoch_stats['num_correct'] = self.epoch_stats['num_total']*self.epoch_stats['acc']
-        return self.epoch_stats
-
-    def report_epoch_stats(self):
-        statistics = [self.epoch_stats['num_correct'], self.epoch_stats['num_total'], self.epoch_stats['loss']] ## could put back with train in (or not distributed)
-        accuracy = float(self.epoch_stats['acc'])/self.epoch_stats['num_graphs']
-        f1 = float(self.epoch_stats['f1'])/self.epoch_stats['num_graphs']
-        loss = float(self.epoch_stats['loss'])/self.epoch_stats['num_graphs']
-        pred_loss = float(self.epoch_stats['pred_loss'])/self.epoch_stats['num_graphs']
-        lp_loss = float(self.epoch_stats['lp_loss'])/self.epoch_stats['num_graphs']
-        lp_roc = float(self.epoch_stats['lp_roc'])/self.epoch_stats['num_graphs']
-
-        print(self.epoch_stats,'epoch')
-        print(lp_loss,'L Pizzle')
-        avg_stats = {
-            'prefix': self.epoch_stats['prefix'],
-            'epoch':  self.epoch_stats['epoch'],
-            'loss': loss,
-            'pred_loss': pred_loss,
-            'lp_loss': lp_loss,
-            'f1': f1,
-            'acc': accuracy,
-            'lp_roc':lp_roc
-            # 'num_correct': 0,## add to acc_f1 funct
-            # 'num_true':0,
-            # 'num_false':0,
-            # 'num_graphs':0,
-            # 'num_total': 0,
-        }
-        stat_string="%s phase of epoch %d: accuracy %.6f,f1 %.6f, loss %d,lp_loss %d,pred_loss %d, nodes total %d, graphs total %d" % (
-                self.epoch_stats['prefix'],
-                self.epoch_stats['epoch'],
-                accuracy,
-                f1,
-                loss, 
-                lp_loss,
-                pred_loss,
-                self.epoch_stats['num_total'],
-                self.epoch_stats['num_graphs'])
-
-        # if self.epoch_stats['prefix'] != 'test':
-        #     self.logger.info(
-        #         "rank %d, %s phase of epoch %d: accuracy %.6f,f1 %.6f, loss %.6f, num_correct %d, total %d" % (
-        #         self.args.distributed_rank,
-        #         self.epoch_stats['prefix'],
-        #         self.epoch_stats['epoch'],
-        #         accuracy, 
-        #         f1,
-        #         loss,
-        #         self.epoch_stats['num_correct'], 
-        #         self.epoch_stats['num_total']))
-
-        if (self.pruner) and (self.epoch_stats['prefix'] == 'dev'): ## all added by Cole
-            print('reported')
-            metric = loss
-            self.trial.report(metric, self.epoch_stats['epoch'])
-            if self.trial.should_prune():
-                print('PRUNED')
-                raise optuna.exceptions.TrialPruned()
-
-
-        return avg_stats,stat_string
 class LPModel(BaseModel):
     """
     Base model for link prediction task.
     """
 
     def __init__(self, args):
+        print(LPModel)
+
+        # print(self,'SEKF')
+        super(LPModel, self)
+        print(type(self))
         super(LPModel, self).__init__(args)
         self.dc = FermiDiracDecoder(r=args.r, t=args.t) 
         #### ADD TEMPERATURE DECODER RIGHT HERE!!!!
@@ -402,12 +166,7 @@ class LPModel(BaseModel):
     def true_probs(self,adj_probs,idx):
         # print(adj_probs.shape,'adj prob!')
         true_probs = adj_probs[idx[:,0],idx[:,1]]
-
-
-
         return true_probs
-
-
 
     def sample_distance_loss(self,embeddings,edges,false_dict,num_sample=10):
 
@@ -520,6 +279,98 @@ class LPModel(BaseModel):
         print(mean_rank,mAP,'scores')
         return mean_rank,mAP,mean_degree
 
+    def get_embedding_correlation(self,embeddings,adj_mat_true):
+        emb_dict={}
+        calc_dists=[]
+        calc_probs=[]
+        calc_dists_sq=[]
+        true_dists=[]
+        true_probs=[]
+        true_dists_inv=[]
+        dist_mat_true=1-np.array(adj_mat_true).squeeze()
+        dist_mat_true_inv=1/np.array(adj_mat_true).squeeze()
+        adj_mat_true=np.array(adj_mat_true).squeeze()
+        print(embeddings.shape,'EMBEDDING SHAPE')
+        print(dist_mat_true.shape,'dist_mat_true SHAPE')
+
+        if dist_mat_true.shape[0]!=embeddings.shape[0]:
+            assert  dist_mat_true.shape[0]==embeddings.shape[0]-1, 'if not equal shape, must be one off due to virtual node'
+        for i in range(dist_mat_true.shape[0]):
+            embi=torch.tensor(embeddings[i])
+            
+            # print(embi.shape,'FIRST EMBEDDING')
+
+            for j in range(i+1,dist_mat_true.shape[0]):
+                embj=torch.tensor(embeddings[j])
+                # print(embj.shape,'SECOND EMBEDDING')
+                calc_dist_sq=self.manifold.sqdist(embi, embj, self.c).detach().numpy()[0]
+                calc_dist=(calc_dist_sq)**(1/2)
+                # print(calc_dist)
+                true_dist=dist_mat_true[i,j]
+                true_prob=adj_mat_true[i,j]
+                true_dist_inv=dist_mat_true_inv[i,j]
+                # print(true_dist,'true dist')
+                true_probs.append(true_prob)
+                true_dists.append(true_dist)
+                true_dists_inv.append(true_dist_inv)
+                calc_dists.append(calc_dist)
+                calc_dists_sq.append(calc_dist_sq)
+                calc_probs.append(self.dc.forward(calc_dist))
+        # print(true_dists,'TRUE DIST')
+        # print(calc_dists,'TRUE DIST')
+        # spearman=scipy.stats.spearmanr(true_dists,true_dists)
+        # spearman=scipy.stats.spearmanr(true_dists,calc_dists)[0]
+        # print(spearman,'spear')
+        # pearson=scipy.stats.pearsonr(true_dists,calc_dists)[0]
+
+        # print(o)
+        # print(pearson,'PEAR')
+
+        # plt.scatter(true_dists,calc_dists)
+        # plt.text(y=1,x=1,s='Spearman: '+str(spearman))
+        # plt.text(y=1.5,x=1.5,s='Pearson: '+str(pearson))
+        # plt.show()
+
+        # print(true_dists_inv)
+        # print(calc_dists)
+        # calc_probs = self.dc.forward(np.array(calc_dists_sq))
+
+        # print(len(true_dists_inv),len(calc_dists),'first shapes')
+        # print(len(true_dists),len(calc_probs),'first shapes')
+        # print(calc_probs)
+
+
+        spearman=scipy.stats.spearmanr(true_dists_inv,calc_dists)[0]
+        # spearman2=scipy.stats.spearmanr(true_probs,calc_probs)[0]
+        # print(spearman,'spear')
+        # pearson=scipy.stats.pearsonr(true_dists_inv,calc_dists)[0]
+        # pearson2=scipy.stats.pearsonr(true_probs,calc_probs)[0]
+        pearson=0
+        # print(spearman,pearson,'correlations')
+
+        # plt.scatter(true_dists_inv,calc_dists)
+        # plt.text(y=1,x=1,s='Spearman: '+str(spearman))
+        # plt.text(y=1.5,x=1.5,s='Pearson: '+str(pearson2))
+        # plt.text(y=1.5,x=1.5,s='Inv dist to dist ')
+        # plt.show()
+
+        # plt.scatter(true_probs,calc_probs)
+        
+        # plt.text(y=1,x=1,s='Spearman: '+str(spearman2))
+        # plt.text(y=1.5,x=1.5,s='Pearson: '+str(pearson2))
+        # # plt.text(y=1.5,x=1.5,s='Inv dist to dist ')
+        # plt.show()
+
+        # plt.hist(true_probs,bins=40)
+        # plt.hist(calc_probs,bins=40)
+        # plt.show()
+
+        # plt.text(y=1.5,x=1.5,s='Pearson: '+str(pearson))
+        # plt.show()
+
+
+
+        return spearman,pearson
 
     def train_calibration_model(self):
         calibration_model = self.calibration_model if self.calibration_model is not None else ''
@@ -534,29 +385,92 @@ class LPModel(BaseModel):
     def loss_handler(self,edges,edges_false,pos_probs,neg_probs,pos_scores,neg_scores,num_graphs):
 
         if hasattr(self.args,'use_weighted_loss') and self.args.use_weighted_loss:
-            # adj_prob = data['adj_prob']
-            # neg_probs = self.true_probs(adj_prob,edges_false)
-            # pos_probs = self.true_probs(adj_prob,edges)
 
-            # print(pos_scores.shape,'POS SCORES SHAPE')
-            loss = F.mse_loss(pos_scores,pos_probs)
-            neg_loss= F.mse_loss(neg_scores,neg_probs)
+            if hasattr(self.args,'use_weighted_bce') and self.args.use_weighted_bce:
+                l_func=F.binary_cross_entropy
+
+            else:
+                l_func=F.mse_loss
+
+
+            # print(hasattr(self.args,'unify_pos_neg_loss'),'do we have unifying')
+            if hasattr(self.args,'unify_pos_neg_loss') and self.args.unify_pos_neg_loss:
+
+                # loss = l_func(pos_scores,pos_probs)
+                # neg_loss = l_func(neg_scores,neg_probs)  
+                # # print(loss,'POS LOSS OG')
+                # # print(neg_loss,'NEG LOSS OG')
+                # # print(pos_scores.size,'pos_scores shape')
+                # # print(neg_scores.size,'neg_scores shape')
+                # ratio=neg_scores.shape[0]/pos_scores.shape[0]
+                # print(ratio,'ratio?')
+                # loss+=neg_loss*ratio
+                # print(pos_scores.shape,'pos_scores shape')
+                # print(neg_scores.shape,'neg_scores shape')
+                scores=torch.cat([pos_scores,neg_scores], dim=-1)
+
+                probs=torch.cat([pos_probs,neg_probs], dim=-1)
+                loss = l_func(scores,probs)*2
+                # print(loss,'FINAL LOSS OG')
+                # print(scores.shape,'score shape')
+            else:
+                if torch.any(torch.isnan(pos_scores)):
+                    print(pos_scores,'pos scores??')
+                    print('NANS IN POS SCORES')
+                    pos_scores=torch.where(torch.isnan(pos_scores),.01,pos_scores)
+                    print(pos_scores,'new scores')
+                    print(torch.any(torch.isnan(pos_scores)),'any left??')
+                    # assert False
+                if torch.any(torch.isnan(neg_scores)):
+                    print('NANS IN NEG SCORES')
+                    neg_scores=torch.where(torch.isnan(neg_scores),.99,neg_scores)     
+                    print(neg_scores,'new scores')
+                    print(torch.any(torch.isnan(neg_scores)),'any left??')
+                    # assert False               
+                loss = l_func(pos_scores,pos_probs)
+                neg_loss = l_func(neg_scores,neg_probs)  
+                loss+=neg_loss
+                # l_func=F.mse_loss
 
         else:
             # print(pos_scores,'POSITIVE SCORES????')
+            # if/
             loss = F.binary_cross_entropy(pos_scores, torch.ones_like(pos_scores)) ### is this average or sum??
         # #     # print(loss,'pos loss')
             neg_loss=F.binary_cross_entropy(neg_scores, torch.zeros_like(neg_scores))
-        loss+=neg_loss
+            loss+=neg_loss
+
+        
         if pos_scores.is_cuda:
             pos_scores = pos_scores.cpu()
             neg_scores = neg_scores.cpu()
 
         labels = [1] * pos_scores.shape[0] + [0] * neg_scores.shape[0]
-        preds = np.array(list(pos_scores.data.cpu().numpy()) + list(neg_scores.data.cpu().numpy()))
+
+        preds =np.array(list(pos_scores.data.cpu().numpy()) + list(neg_scores.data.cpu().numpy()))
+        # labels= torch.where(torch.isnan(preds),.01,labels)
+        # preds= torch.where(torch.isnan(preds),.99,preds)
+        # preds=np.array(preds)
         roc = roc_auc_score(labels, preds)
         ap = average_precision_score(labels, preds)
         acc = binary_acc(labels,preds)
+        # try:
+        #     roc = roc_auc_score(labels, preds)
+        #     ap = average_precision_score(labels, preds)
+        #     acc = binary_acc(labels,preds)
+        # except Exception as e:
+        #     print(e)
+        #     print('error in roc')
+        #     print(torch.isnan(preds),labels,'labels')
+        #     print(torch.isnan(preds),preds,'preds')
+        #     # labels=torch.where(torch.isnan(preds),.01,labels)
+        #     # preds=torch.where(torch.isnan(preds),.99,preds)
+        #     # roc = roc_auc_score(labels, preds)
+        #     # ap = average_precision_score(labels, preds)
+        #     # acc = binary_acc(labels,preds)
+        #     roc=torch.Tensor(0)
+        #     ap=torch.Tensor(0)
+        #     acc=torch.Tensor(0)
         # ECE,MCE = get_calibration_metrics(labels,preds,one_side=False)
         ECE,MCE=0,0
         metrics = {'loss': loss, 'roc': roc, 'ap': ap,'acc':acc,'ECE':ECE,
@@ -574,10 +488,13 @@ class LPModel(BaseModel):
             edges_false = data['edges_false']
             edges = data['edges'] 
             # false_dict = data[f'false_dict']
-        sample_rate=10
+        # sample_rate=10
+        # print NOT SAMPLING NO REASON!! 
+        # we can do all negative edge
         sample_rate=-1
         # if split == 'train' or (self.args.train_only): 
         if split == ('train') and (sample_rate>0): 
+            raise Exception('We should not be sampling right now.')
         #     ### here we should sample ?
             try:
                 self.train_only
@@ -592,6 +509,7 @@ class LPModel(BaseModel):
                     edges_false = torch.concat([edges_false,data[f'{s}_edges_false']]) ### goddammit why are you so stupid- this is where the split happens shitbird
                     # edges+=data[f'{s}_edges']
                     edges = torch.concat([edges,data[f'{s}_edges']]) 
+
             edges_false = edges_false[np.random.randint(0, len(edges_false),len(edges)*sample_rate)]
             # try:
                 # edges_false = edges_false[np.random.randint(0, len(edges_false),len(edges)*sample_rate)]
@@ -613,6 +531,8 @@ class LPModel(BaseModel):
             embeddings=embeddings_list[i]
             data=data_list[i]
             edges,edges_false = self.get_edges(embeddings,data,split)
+            # print(edges.shape,'num edges')
+            # print(edges_false.shape,'num edges_false')
 
             pos_scores = self.decode(embeddings, edges)
             neg_scores = self.decode(embeddings, edges_false)
@@ -656,39 +576,16 @@ class LPModel(BaseModel):
 
   
     def compute_metrics(self, embeddings, data, split,verbose=False): ## need new one for inductive edges ie. brand new graphs
-        # if not self.is_inductive:
-        #     edges_false = data[f'{split}_edges_false'] ### goddammit why are you so stupid- this is where the split happens shitbird
-        #     edges = data[f'{split}_edges']
-        #     # false_dict = data[f'{split}_false_dict']
-        # else: ## because train / val splits naturally are unbalanced-- maybe try one without balancing?
-        #     edges_false = data['edges_false']
-        #     edges = data['edges'] 
-        #     false_dict = data[f'false_dict']
-        # if split == 'train': 
-        # #     ### here we should sample ?
-        #     try:
-        #         self.train_only
-        #     except:
-        #         print('NO TRAIN ONLY')
-        #         self.train_only=False
-        #     if self.train_only and not self.is_inductive:  ## train only comes in at different location (GraphDataset) for inductive train noly
-        #         # edges=[]
-        #         # edges_false=[]
-        #         splits=['val','test']
-        #         for s in splits:
-        #             edges_false = torch.concat([edges_false,data[f'{s}_edges_false']]) ### goddammit why are you so stupid- this is where the split happens shitbird
-        #             # edges+=data[f'{s}_edges']
-        #             edges = torch.concat([edges,data[f'{s}_edges']]) 
-        #     try:
-        #         edges_false = edges_false[np.random.randint(0, len(edges_false),len(edges)*sample_rate)]
-        #     except:
-        #         print(data['adj_mat'].to_dense(),'No negative edges??')
-        #     self.previous_edges_false=edges_false
-
         edges,edges_false = self.get_edges(embeddings,data,split)
 
         pos_scores = self.decode(embeddings, edges)
         neg_scores = self.decode(embeddings, edges_false)
+
+        # print(pos_scores.shape,'POS SCORES')
+        # print(neg_scores.shape,'NEG SCORES')
+
+        # print(edges.shape,'POS EDGES')
+        # print(edges_false.shape,'NEG EDGES')
         # print(embeddings.shape,'embeddings')
         # print(edges.shape,'edges')
         # print(pos_scores.shape,'pos scores')
@@ -839,6 +736,12 @@ class LPModel(BaseModel):
         loss = float(self.epoch_stats['loss'])/self.epoch_stats['num_updates']
         acc =  float(self.epoch_stats['acc'])/float(self.epoch_stats['num_updates'])
         ECE =  float(self.epoch_stats['ECE'])/float(self.epoch_stats['num_updates'])
+
+        # precision = float(self.epoch_stats['ap'])/self.epoch_stats['num_graphs']
+        # roc = float(self.epoch_stats['roc'])/self.epoch_stats['num_graphs']
+        # loss = float(self.epoch_stats['loss'])/self.epoch_stats['num_graphs']
+        # acc =  float(self.epoch_stats['acc'])/float(self.epoch_stats['num_graphs'])
+        # ECE =  float(self.epoch_stats['ECE'])/float(self.epoch_stats['num_graphs'])
 
         avg_stats = {
             'prefix': self.epoch_stats['prefix'],

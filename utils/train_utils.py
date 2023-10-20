@@ -92,3 +92,36 @@ def add_flags_from_config(parser, config_dict):
     return parser
 
 
+
+def checkpoint_params(model):
+    """
+    creates a saved checkpoint of model params that can be used to see if a model has changed
+    """
+
+    # get a list of params that are allowed to change
+    params = [ np for np in model.named_parameters() if np[1].requires_grad ]
+    #take a copy
+    initial_params = [ (name, p.clone()) for (name, p) in params ]
+    return initial_params
+
+def has_model_changed(model,initial_params):
+    device= 'cuda' if torch.cuda.is_available() else 'cpu'
+    new_params=checkpoint_params(model)
+    # print(initial_params,'initial_params')
+    # print(new_params,'initial_params')
+    # check if variables have changed
+    all_ch=True
+    any_ch=False
+    for (_, p0), (name, p1) in zip(initial_params, new_params):
+        eq= torch.equal(p0.to(device), p1.to(device))
+        # print(eq,'IS EQUAL')
+        if eq:
+            all_ch=False
+        else:
+            any_ch=True
+    if all_ch:
+        assert any_ch
+
+    # print(all_ch,any_ch)
+
+    return all_ch,any_ch
