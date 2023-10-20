@@ -18,12 +18,9 @@
 *** for contributors-url, forks-url, etc. This is an optional, concise syntax you may use.
 *** https://www.markdownguide.org/basic-syntax/#reference-style-links
 -->
-[![Contributors][contributors-shield]][contributors-url]
-[![Forks][forks-shield]][forks-url]
-[![Stargazers][stars-shield]][stars-url]
-[![Issues][issues-shield]][issues-url]
+
 [![MIT License][license-shield]][license-url]
-[![LinkedIn][linkedin-shield]][linkedin-url]
+[![LinkedIn][linkedin-shield]][https://www.linkedin.com/in/cole-baker-724573130/]
 
 
 
@@ -59,25 +56,23 @@ Getting started. Run """conda env create -f environment.yml """
     - [ ] Binarize PLV
     - [ ] ROI to RSN
 
-- [ ] Model Training
+- [x] Model Training
     - [x] Training. The code for this is in train_inductive.py. It can be triggered several ways, most simply by calling main.py.
     - [x] Hyperparameter tuning. The code for this is in hyperparams.py, which runs hyperparameter tuning according to hyperparam_config 
     - [x] Scripts for training experiments for Link Prediction experiments. The code for this is in study_linkprediction. It utilizes the hyperparameter code. This is not quite complete.
             Additionally, it may take up to a day or more to run all combinations. The code is designed to start from where it left off it processes to not complete.
-    - [ ] Baselines
 
 
-
-- [ ] Embedding Analysis
-    - [ ] Link Prediction
+- [x] Embedding Analysis
+    - [x] Link Prediction. The code for this is available in link_prediction.ipynb
     - [x] RSN groupings and featurization. The code for this is available in ingest_embedding.ipynb
     - [x] Statistical Analysis. The code for this is available in anova_analysis.ipynb
     - [x] Disease Classificaition. The code for this is available in classification_final.ipynb
 
 
-- [ ] Recreate Plots
+- [x] Recreate Plots
     - [x] Statistical Analysis
-    - [ ] Classification 
+    - [x] Classification 
     - [ ] Binary Connectivity Matrix
     - [ ] Raw Connectivity Matrix
     - [ ] Diagram of HGCN (Big, pp slide)
@@ -104,9 +99,8 @@ Distributed under the MIT License. See `LICENSE.txt` for more information.
 <!-- CONTACT -->
 ## Contact
 
-Your Name - [@twitter_handle](https://twitter.com/twitter_handle) - email@email_client.com
+Your Name - [@ColeBakerUSA](https://twitter.com/ColeBakerUSA)
 
-Project Link: [https://github.com/github_username/repo_name](https://github.com/github_username/repo_name)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -126,13 +120,13 @@ Project Link: [https://github.com/github_username/repo_name](https://github.com/
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
 [contributors-shield]: https://img.shields.io/github/contributors/github_username/repo_name.svg?style=for-the-badge
-[contributors-url]: https://github.com/github_username/repo_name/graphs/contributors
+[contributors-url]: https://github.com/ColeSBaker/hyperBrain/repo_name/graphs/contributors
 [forks-shield]: https://img.shields.io/github/forks/github_username/repo_name.svg?style=for-the-badge
-[forks-url]: https://github.com/github_username/repo_name/network/members
+[forks-url]: https://github.com/ColeSBaker/hyperBrain/network/members
 [stars-shield]: https://img.shields.io/github/stars/github_username/repo_name.svg?style=for-the-badge
-[stars-url]: https://github.com/github_username/repo_name/stargazers
+[stars-url]: https://github.com/ColeSBaker/hyperBrain/stargazers
 [issues-shield]: https://img.shields.io/github/issues/github_username/repo_name.svg?style=for-the-badge
-[issues-url]: https://github.com/github_username/repo_name/issues
+[issues-url]: https://github.com/ColeSBaker/hyperBrain/issues
 [license-shield]: https://img.shields.io/github/license/github_username/repo_name.svg?style=for-the-badge
 [license-url]: https://github.com/github_username/repo_name/blob/master/LICENSE.txt
 [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
